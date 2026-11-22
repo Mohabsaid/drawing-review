@@ -44,11 +44,13 @@ aside{border-right:1px solid var(--line)}
 .tool label{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:0 10px;min-height:40px;font-size:14px}
 .hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:var(--mute);background:var(--bg);padding:2px 6px}
 .mlabel{position:absolute;transform:translate(-50%,-140%);background:#ffd400;color:#111;font-weight:600;font-size:13px;padding:2px 8px;pointer-events:none;display:none;white-space:nowrap}
+.mtip{position:absolute;display:none;pointer-events:none;background:#00e5ff;color:#111;font-weight:600;font-size:13px;padding:3px 8px;white-space:nowrap;z-index:3}
 .mout{position:absolute;left:12px;right:12px;top:64px;font-size:15px;pointer-events:none;z-index:2}.mout span:not(:empty){display:inline-block;margin-top:4px}.mout span:not(:empty){background:var(--bg);padding:3px 6px}
 #pdfBox,#dxfBox{position:absolute;inset:56px 0 0 0;overflow:auto;background:var(--soft)}
 #pdfBox canvas{display:block;margin:12px auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15)}
 #dxfBox{overflow:hidden;cursor:grab;touch-action:none}#dxfBox svg{width:100%;height:100%;display:block}
-.geo line,.geo circle,.geo path{stroke:currentColor;stroke-width:1.3px;vector-effect:non-scaling-stroke;fill:none}.geo .bend{stroke:var(--red);stroke-dasharray:8 5}
+.geo line,.geo circle,.geo path{stroke:currentColor;stroke-width:1.3px;vector-effect:non-scaling-stroke;fill:none}.hv,.rs{fill:none;stroke:#00e5ff;vector-effect:non-scaling-stroke}.rs{stroke:#ffd400}.hvf{fill:#00e5ff}.rsf{fill:#ffd400}
+.geo .bend{stroke:var(--red);stroke-dasharray:8 5}
 .facts{position:absolute;right:12px;bottom:12px;max-width:340px;pointer-events:none;background:var(--bg);border:1.5px solid var(--ink);padding:8px 12px;font-size:13px;line-height:1.6}
 #checks{padding:18px max(2vw,14px);overflow:auto;position:absolute;inset:0}
 .chk{display:grid;grid-template-columns:86px 1fr;gap:4px 14px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -201,7 +203,7 @@ $('app').innerHTML=`
         <label><input type="checkbox" id="single"> Isolate</label>
         <button id="mBtn" aria-pressed="false">Measure</button><button id="fit">Fit</button><button id="vIso">Iso</button><button id="vTop">Top</button><button id="vFront">Front</button>
       </div>
-      <div class="mlabel" id="mLabel"></div>
+      <div class="mlabel" id="mLabel"></div><div class="mtip" id="mTip"></div>
       <div class="mout"><span id="pieceNote"></span> <span id="mOut"></span></div>
       <div class="hint">Drag to rotate · right-drag or two fingers to pan · scroll or pinch to zoom · tap a piece to select it</div>
       <div class="loading" id="load3d"><div id="loadMsg">Loading files from Drive…</div><div class="bar"><i></i></div></div>
@@ -411,21 +413,21 @@ const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
 function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.className='';S.innerHTML='';return}
   const ks=PARTS.filter(p=>picked.has(p.k)).map(p=>p.k);S.className='sendc';
   S.innerHTML=`<h2>Send to a client</h2><div class="sub">Part${ks.length>1?'s':''} ${ks.join(', ')} — DXF${PARTS.some(p=>picked.has(p.k)&&p.pdfMeta)?' and drawing':''} of each</div>
-   <div class="row2"><input type="tel" id="cWa" placeholder="Client WhatsApp, e.g. 2010…" aria-label="Client WhatsApp number" value="${esc(ls.get('rv_cwa'))}"><input type="email" id="cMail" placeholder="Client email" aria-label="Client email" value="${esc(ls.get('rv_cmail'))}"></div>
-   <div class="row2"><button id="shF" class="on">Share files</button><button id="zipF">Download ZIP</button></div>
-   <div class="row2"><button id="lkW">WhatsApp with links</button><button id="lkM">Email with links</button></div>
-   <div class="sub">"Share files" sends the real files through WhatsApp, Gmail… (phone or PC share menu). The link buttons send Drive links instead.</div>
+   <div class="row2"><button id="shW" class="on">WhatsApp</button><button id="shM" class="on">Email</button></div>
+   <button id="zipF">Download files (ZIP)</button>
+   <div class="sub">Opens your own WhatsApp or email with the files attached — you pick who to send to. On a computer where that isn't possible, the files download and WhatsApp / Gmail opens so you can attach them.</div>
    <div class="msg" id="cMsg"></div>`;
   const M=(t,e)=>{$('cMsg').textContent=t;$('cMsg').className='msg'+(e?' err':'')};
-  const keep=()=>{ls.set('rv_cwa',$('cWa').value.replace(/\D/g,''));ls.set('rv_cmail',$('cMail').value.trim())};
-  $('shF').onclick=async()=>{keep();M('Preparing files…');try{const fs=await partFiles();
-      if(navigator.canShare&&navigator.canShare({files:fs})){await navigator.share({files:fs,title:P.name,text:`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`});M('Shared.')}
-      else{await zipDownload(fs);M('This browser can\'t share files directly, so a ZIP was downloaded — attach it in WhatsApp or email.')}}
-    catch(e){if(e&&e.name==='AbortError')M('');else M(e.message||'Could not share.',1)}};
-  $('zipF').onclick=async()=>{keep();M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
-  const linkText=()=>[`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`,...PARTS.filter(p=>picked.has(p.k)).flatMap(p=>[``,`Part ${p.k} (Qty ${p.qty??'?'}${p.rl?' R&L':''}, ${p.t??'?'} mm):`,`• DXF: ${viewUrl(p.dxfMeta.id)}`,p.pdfMeta?`• Drawing: ${viewUrl(p.pdfMeta.id)}${p.pdfMeta.page?' (page '+p.pdfMeta.page+')':''}`:''].filter(x=>x!==''||true))].join('\n');
-  $('lkW').onclick=()=>{keep();const n=$('cWa').value.replace(/\D/g,'');const a=document.createElement('a');a.href='https://wa.me/'+n+'?text='+encodeURIComponent(linkText());a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  $('lkM').onclick=()=>{keep();const a=document.createElement('a');a.href='mailto:'+encodeURIComponent($('cMail').value.trim())+'?subject='+encodeURIComponent(P.name+' — parts '+ks.join(', '))+'&body='+encodeURIComponent(linkText());document.body.appendChild(a);a.click();a.remove()};
+  const title=`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`;
+  const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
+  const go=async app=>{M('Preparing files…');let fs;try{fs=await partFiles()}catch(e){M(e.message,1);return}
+    if(navigator.canShare&&navigator.canShare({files:fs})){try{await navigator.share({files:fs,title,text:title});M('Done.');return}catch(e){if(e&&e.name==='AbortError'){M('');return}}}
+    try{await zipDownload(fs)}catch(e){M(e.message,1);return}
+    if(app==='wa')open('https://web.whatsapp.com/send?text='+encodeURIComponent(title+' — files attached'));
+    else open('https://mail.google.com/mail/?view=cm&fs=1&su='+encodeURIComponent(title)+'&body='+encodeURIComponent('Please find attached the DXF and drawing files for '+title+'.'));
+    M(app==='wa'?'The files were downloaded as a ZIP and WhatsApp opened — choose the contact, then attach the ZIP (paperclip) and send.':'The files were downloaded as a ZIP and a new Gmail message opened — attach the ZIP, write the address and send.')};
+  $('shW').onclick=()=>go('wa');$('shM').onclick=()=>go('mail');
+  $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
 async function partFiles(){const out=[];
   for(const p of PARTS.filter(p=>picked.has(p.k))){
@@ -495,30 +497,94 @@ function view(v){const bx=new THREE.Box3();for(const m of shown())bx.expandByObj
   const d=v==='top'?[0.001,-0.001,1]:v==='front'?[0,-1,0.001]:[0.9,-1.1,0.9],L=Math.hypot(...d);cam.position.set(c.x+d[0]/L*r,c.y+d[1]/L*r,c.z+d[2]/L*r);ctl.target.copy(c);ctl.update()}
 function resize3d(){const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;R.setSize(w,h,false);R.domElement.style.width='100%';R.domElement.style.height='100%';cam.aspect=w/h;cam.updateProjectionMatrix()}
 const ro3=new ResizeObserver(resize3d);ro3.observe(host);
-const lbl=$('mLabel');
+let mLab=null;const lbl=$('mLabel'),tip=$('mTip');
 (function loop(){requestAnimationFrame(loop);if(tab!=='3d')return;ctl.update();R.render(scene,cam);
-  if(mPts.length===2){const a=mPts[0].w.clone().add(mPts[1].w).multiplyScalar(.5).project(cam);lbl.style.display='block';lbl.style.left=((a.x+1)/2*host.clientWidth)+'px';lbl.style.top=((1-a.y)/2*host.clientHeight)+'px'}else lbl.style.display='none'})();
+  if(mLab){const a=mLab.clone().project(cam);lbl.style.display='block';lbl.style.left=((a.x+1)/2*host.clientWidth)+'px';lbl.style.top=((1-a.y)/2*host.clientHeight)+'px'}else lbl.style.display='none'})();
 $('explode').oninput=explode;$('explode').onchange=()=>view(curView);$('isolate').onchange=paint3d;
 $('single').onchange=()=>{if(single()&&!one)one=meshes.find(m=>m.userData.part===sel)||null;$('explode').disabled=single();paint3d();explode();view(curView)};
 $('fit').onclick=()=>view(curView);$('vIso').onclick=()=>view(curView='iso');$('vTop').onclick=()=>view(curView='top');$('vFront').onclick=()=>view(curView='front');
-$('mBtn').onclick=()=>{measOn=!measOn;$('mBtn').classList.toggle('on',measOn);$('mBtn').setAttribute('aria-pressed',measOn);clearMeas();R.domElement.style.cursor=measOn?'crosshair':''};
-function clearMeas(){mPts=[];mGroup.clear();$('mOut').textContent=measOn?'Measure is on — click the first point on the model (it snaps to corners and edges)':''}
-function addPt(hit,sx,sy){const m=hit.object,r=R.domElement.getBoundingClientRect(),pos=m.geometry.attributes.position,f=hit.face;
-  const vs=[f.a,f.b,f.c].map(i=>new THREE.Vector3().fromBufferAttribute(pos,i)),cands=[...vs];for(let i=0;i<3;i++)cands.push(vs[i].clone().add(vs[(i+1)%3]).multiplyScalar(.5));
-  let best=m.worldToLocal(hit.point.clone()),bd=16;
-  for(const c of cands){const w=m.localToWorld(c.clone()).project(cam),px=Math.hypot((w.x+1)/2*r.width-sx,(1-w.y)/2*r.height-sy);if(px<bd){bd=px;best=c.clone()}}
-  const w=m.localToWorld(best.clone());mPts.push({l:best,w});
-  const dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius*0.008,1.5),16,12),new THREE.MeshBasicMaterial({color:0xffd400,depthTest:false}));dot.position.copy(w);dot.renderOrder=9;mGroup.add(dot);
-  if(mPts.length===1){$('mOut').textContent='Now click the second point';return}
-  const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mPts[0].w,mPts[1].w]),new THREE.LineBasicMaterial({color:0xffd400,depthTest:false}));ln.renderOrder=9;mGroup.add(ln);
-  const d=mPts[1].l.clone().sub(mPts[0].l);lbl.textContent=f2(d.length())+' mm';
-  $('mOut').innerHTML=`Distance <b>${f2(d.length())} mm</b> · ΔX ${f2(Math.abs(d.x))} · ΔY ${f2(Math.abs(d.y))} · ΔZ ${f2(Math.abs(d.z))}`}
+$('mBtn').onclick=()=>{measOn=!measOn;$('mBtn').classList.toggle('on',measOn);$('mBtn').setAttribute('aria-pressed',measOn);clearMeas();setHover(null);R.domElement.style.cursor=measOn?'crosshair':''};
+const YEL=0xffd400,matP=new THREE.MeshBasicMaterial({color:YEL,depthTest:false}),matL=new THREE.LineBasicMaterial({color:YEL,depthTest:false}),matH=new THREE.LineBasicMaterial({color:0x00e5ff,depthTest:false}),matHP=new THREE.MeshBasicMaterial({color:0x00e5ff,depthTest:false});
+const hGroup=new THREE.Group();scene.add(hGroup);
+function clearMeas(){mPts=[];mLab=null;mGroup.clear();$('mOut').textContent=measOn?'Measure is on — move over the part: a corner, an edge, a hole or a bend lights up. Click it to measure; click two points for a distance.':''}
+const dotR=()=>Math.max(radius*0.007,1.2);
+function dot(w,mat){const d=new THREE.Mesh(new THREE.SphereGeometry(dotR(),16,12),mat);d.position.copy(w);d.renderOrder=9;return d}
+function line(pts,mat,loop){const l=new (loop?THREE.LineLoop:THREE.Line)(new THREE.BufferGeometry().setFromPoints(pts),mat);l.renderOrder=9;return l}
+
+/* feature edges of a body, joined into straight edges, holes and bends */
+const K=v=>Math.round(v.x*100)+','+Math.round(v.y*100)+','+Math.round(v.z*100);
+function edgeData(m){if(m.userData.ed)return m.userData.ed;
+  const a=m.children[0].geometry.attributes.position,segs=[],adj=new Map();
+  for(let i=0;i<a.count;i+=2){const p=new THREE.Vector3().fromBufferAttribute(a,i),q=new THREE.Vector3().fromBufferAttribute(a,i+1);if(p.distanceTo(q)<1e-6)continue;const s=segs.length;segs.push([p,q]);for(const v of [p,q]){const k=K(v);if(!adj.has(k))adj.set(k,[]);adj.get(k).push(s)}}
+  const dir=s=>segs[s][1].clone().sub(segs[s][0]).normalize();
+  const turn=(s,t)=>{const c=Math.abs(dir(s).dot(dir(t)));return Math.acos(Math.min(1,c))*180/Math.PI};
+  const corner=new Set();for(const [k,l] of adj){if(l.length!==2||turn(l[0],l[1])>20)corner.add(k)}
+  return m.userData.ed={segs,adj,turn,corner}}
+function chainOf(m,s0){const ed=edgeData(m),{segs,adj,turn}=ed;
+  const walk=(startS,endPt,maxTurn)=>{const out=[];let s=startS,p=endPt;for(let g=0;g<800;g++){const l=adj.get(K(p));if(!l||l.length!==2)break;const n=l[0]===s?l[1]:l[0];if(n===s0||turn(s,n)>maxTurn)break;const q=K(segs[n][0])===K(p)?segs[n][1]:segs[n][0];out.push(q);s=n;p=q}return out};
+  // curved: follow small turns; if it closes into a circle -> hole
+  const f=walk(s0,segs[s0][1],25),closed=f.length>4&&K(f[f.length-1])===K(segs[s0][0]);
+  const pts=closed?[segs[s0][0],segs[s0][1],...f.slice(0,-1)]:[...walk(s0,segs[s0][0],25).reverse(),segs[s0][0],segs[s0][1],...f];
+  const straight=turn(s0,s0)===0&&pts.length<=2||pts.length<=2;
+  if(!straight&&pts.length>=4){
+    const c=new THREE.Vector3();if(closed){for(const p of pts)c.add(p);c.multiplyScalar(1/pts.length);const rs=pts.map(p=>p.distanceTo(c)),r=rs.reduce((x,y)=>x+y,0)/rs.length,sd=Math.sqrt(rs.reduce((x,y)=>x+(y-r)**2,0)/rs.length);
+      if(sd/r<0.04)return {type:'hole',pts,c,r}}
+    else{const A=pts[0],B=pts[Math.floor(pts.length/2)],C=pts[pts.length-1],a=B.distanceTo(C),b2=A.distanceTo(C),c2=A.distanceTo(B),ar=new THREE.Vector3().subVectors(B,A).cross(new THREE.Vector3().subVectors(C,A)).length()/2;
+      if(ar>1e-6){const r=a*b2*c2/(4*ar);if(r<radius)return {type:'arc',pts,r}}}}
+  // straight edge: merge every segment lying on the same line that touches this one
+  const O=segs[s0][0],D=segs[s0][1].clone().sub(O).normalize(),tol=0.02;
+  const iv=[];for(const [p,q] of segs){const dp=p.clone().sub(O),dq=q.clone().sub(O);
+    if(dp.clone().sub(D.clone().multiplyScalar(dp.dot(D))).length()>tol||dq.clone().sub(D.clone().multiplyScalar(dq.dot(D))).length()>tol)continue;
+    const a=dp.dot(D),b=dq.dot(D);iv.push([Math.min(a,b),Math.max(a,b)])}
+  iv.sort((x,y)=>x[0]-y[0]);let lo=0,hi=segs[s0][1].clone().sub(O).dot(D),ch=true;
+  while(ch){ch=false;for(const [a,b] of iv){if(a<=hi+tol&&b>=lo-tol&&(a<lo-1e-9||b>hi+1e-9)){lo=Math.min(lo,a);hi=Math.max(hi,b);ch=true}}}
+  const P=O.clone().add(D.clone().multiplyScalar(lo)),Q=O.clone().add(D.clone().multiplyScalar(hi));
+  return {type:'edge',pts:[P,Q],len:hi-lo}}
+
+/* what is under the mouse */
+const ray=new THREE.Raycaster();
+function visMeshes(){return single()?shown():($('isolate').checked?meshes.filter(m=>m.userData.part===sel):meshes)}
+function pick(sx,sy){const r=R.domElement.getBoundingClientRect();ray.setFromCamera({x:sx/r.width*2-1,y:-sy/r.height*2+1},cam);
+  const hit=ray.intersectObjects(visMeshes(),false)[0];const cands=hit?[hit.object]:visMeshes();
+  const scr=w=>{const v=w.clone().project(cam);return [(v.x+1)/2*r.width,(1-v.y)/2*r.height,v.z]};
+  const camPos=cam.position,tol=hit?hit.distance*1.004+dotR()*2:Infinity;
+  let best=null;
+  for(const m of cands){const ed=edgeData(m);
+    for(let i=0;i<ed.segs.length;i++){const [p,q]=ed.segs[i],wp=m.localToWorld(p.clone()),wq=m.localToWorld(q.clone());
+      if(wp.distanceTo(camPos)>tol&&wq.distanceTo(camPos)>tol)continue;
+      const A=scr(wp),B=scr(wq);
+      for(const [W,L,S] of [[wp,p,A],[wq,q,B]]){if(!ed.corner.has(K(L)))continue;const d=Math.hypot(S[0]-sx,S[1]-sy);if(d<12&&(!best||best.kind!=='point'||d<best.d))best={kind:'point',d,m,l:L.clone(),w:W}}
+      if(best&&best.kind==='point')continue;
+      const dx=B[0]-A[0],dy=B[1]-A[1],t=Math.max(0,Math.min(1,((sx-A[0])*dx+(sy-A[1])*dy)/(dx*dx+dy*dy||1))),d=Math.hypot(A[0]+t*dx-sx,A[1]+t*dy-sy);
+      if(d<8&&(!best||d<best.d))best={kind:'seg',d,m,s:i}}}
+  if(best&&best.kind==='seg'){const ch=chainOf(best.m,best.s);return {...ch,m:best.m}}
+  if(best)return best;
+  if(hit)return {kind:'point',surface:true,m:hit.object,l:hit.object.worldToLocal(hit.point.clone()),w:hit.point.clone()};
+  return null}
+const W=(m,pts)=>pts.map(p=>m.localToWorld(p.clone()));
+function describe(h){if(!h)return '';if(h.type==='hole')return `Hole Ø ${f2(h.r*2)} mm`;if(h.type==='arc')return `Bend / arc R ${f2(h.r)} mm`;if(h.type==='edge')return `Edge ${f2(h.len)} mm`;return h.surface?'Point on face':'Corner point'}
+function setHover(h,sx,sy){hGroup.clear();if(!h){tip.style.display='none';return}
+  if(h.kind==='point')hGroup.add(dot(h.w,matHP));else{const ws=W(h.m,h.pts);hGroup.add(line(ws,matH,h.type==='hole'));if(h.type==='edge')for(const w of ws)hGroup.add(dot(w,matHP))}
+  tip.textContent=describe(h)+(h.kind==='point'?(mPts.length===1?' — click to finish the distance':' — click to start a distance'):' — click to measure');
+  tip.style.display='block';tip.style.left=(sx+14)+'px';tip.style.top=(sy+14)+'px'}
+let hvRaf=0;
+R.domElement.addEventListener('pointermove',e=>{if(!measOn||e.buttons){return}const r=R.domElement.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  cancelAnimationFrame(hvRaf);hvRaf=requestAnimationFrame(()=>setHover(pick(sx,sy),sx,sy))});
+R.domElement.addEventListener('pointerleave',()=>setHover(null));
+function measure(h){if(!h)return;
+  if(h.kind==='point'){if(mPts.length!==1)clearMeas();mPts.push({l:h.l,w:h.w});mGroup.add(dot(h.w,matP));
+    if(mPts.length===1){$('mOut').textContent='Now click the second point';return}
+    mGroup.add(line([mPts[0].w,mPts[1].w],matL));const d=mPts[1].l.clone().sub(mPts[0].l);mLab=mPts[0].w.clone().add(mPts[1].w).multiplyScalar(.5);lbl.textContent=f2(d.length())+' mm';
+    $('mOut').innerHTML=`Distance <b>${f2(d.length())} mm</b> · ΔX ${f2(Math.abs(d.x))} · ΔY ${f2(Math.abs(d.y))} · ΔZ ${f2(Math.abs(d.z))}`;mPts=[];return}
+  clearMeas();const ws=W(h.m,h.pts);mGroup.add(line(ws,matL,h.type==='hole'));if(h.type==='edge')for(const w of ws)mGroup.add(dot(w,matP));
+  mLab=h.type==='hole'?h.m.localToWorld(h.c.clone()):ws[Math.floor(ws.length/2)].clone().add(ws[Math.max(0,Math.floor(ws.length/2)-1)]).multiplyScalar(.5);
+  lbl.textContent=describe(h);$('mOut').innerHTML=`<b>${describe(h)}</b>`}
 let down=null;R.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
-R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>8)return;const r=R.domElement.getBoundingClientRect();
-  const ray=new THREE.Raycaster();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
-  const vis=single()?shown():($('isolate').checked?meshes.filter(m=>m.userData.part===sel):meshes);const hit=ray.intersectObjects(vis,false)[0];if(!hit)return;
-  if(measOn){if(mPts.length===2)clearMeas();addPt(hit,e.clientX-r.left,e.clientY-r.top);return}
+R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>8)return;const r=R.domElement.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  if(measOn){measure(pick(sx,sy));return}
+  ray.setFromCamera({x:sx/r.width*2-1,y:-sy/r.height*2+1},cam);const hit=ray.intersectObjects(visMeshes(),false)[0];if(!hit)return;
   one=hit.object;if(hit.object.userData.part&&hit.object.userData.part!==sel)select(hit.object.userData.part,true);else paint3d()});
+
 
 /* ---------- PDF ---------- */
 let pdfMode='part',zoom=0,pdfShown=null,pageNo=1;
@@ -544,19 +610,19 @@ function drawDxf(){const p=PARTS.find(x=>x.k===sel),box=$('dxfBox');if(!p||!p.g)
   for(const c of g.circles)snaps.push([c.x,c.y],[c.x+c.r,c.y],[c.x-c.r,c.y],[c.x,c.y+c.r],[c.x,c.y-c.r]);
   ext=p.ext;const W=ext[2]-ext[0],H=ext[3]-ext[1];
   const body=g.polys.map(q=>`<path d="M${q.p.map(pt=>pt[0]+' '+(-pt[1])).join('L')}" ${q.b?'class="bend"':''}/>`).join('')+g.circles.map(c=>`<circle cx="${c.x}" cy="${-c.y}" r="${c.r}" ${c.b?'class="bend"':''}/>`).join('');
-  box.innerHTML=`<svg id="dxfSvg" xmlns="http://www.w3.org/2000/svg"><g class="geo">${body}</g><g id="dm"></g></svg>`;dPts=[];fitDxf();
+  box.innerHTML=`<svg id="dxfSvg" xmlns="http://www.w3.org/2000/svg"><g class="geo">${body}</g><g id="dm"></g><g id="dh"></g></svg>`;dPts=[];dRes=null;fitDxf();
   const holes=g.circles.filter(c=>!c.b),bends=g.polys.filter(q=>q.b).length,dia=[...new Set(holes.map(h=>f2(h.r*2)))];
   $('dxfFacts').innerHTML=`<div>${esc(p.dxfMeta.name)}</div><div>Flat size <b>${f2(W)} × ${f2(H)} mm</b></div><div>Bend lines <b>${bends}</b> · Holes <b>${holes.length}${dia.length?' × Ø'+dia.join(', Ø'):''}</b></div><div id="dOut"></div>`;dOutMsg()}
 function dOutMsg(){const o=$('dOut');if(!o)return;if(!dMeas){o.textContent='';return}
-  if(dPts.length<2){o.innerHTML=`<span class="sub">Measure: tap ${dPts.length?'the second':'the first'} point (snaps to corners, midpoints, hole centres)</span>`;return}
+  if(dPts.length<2){o.innerHTML=`<span class="sub">${dPts.length?'Now click the second point':'Move over the flat: a corner, an edge, a hole or an arc lights up — click to measure. Two points give a distance.'}</span>`;return}
   const dx=dPts[1][0]-dPts[0][0],dy=dPts[1][1]-dPts[0][1];o.innerHTML=`Distance <b>${f2(Math.hypot(dx,dy))} mm</b> · ΔX ${f2(Math.abs(dx))} · ΔY ${f2(Math.abs(dy))}`}
-function drawDm(){const g=$('dm');if(!g||!vb)return;const s=vb[2]/$('dxfBox').clientWidth;
+function drawDm(){const g=$('dm');if(!g||!vb)return;const s=vb[2]/$('dxfBox').clientWidth;if(dRes&&!dPts.length){g.innerHTML=dShape(dRes,'rs');return}
   g.innerHTML=dPts.map(p=>`<circle cx="${p[0]}" cy="${-p[1]}" r="${s*5}" fill="#e4002b"/>`).join('')+(dPts.length===2?`<line x1="${dPts[0][0]}" y1="${-dPts[0][1]}" x2="${dPts[1][0]}" y2="${-dPts[1][1]}" stroke="#e4002b" stroke-width="${s*2}"/>`:'')}
 function setVb(){const s=$('dxfSvg');if(s){s.setAttribute('viewBox',vb.join(' '));drawDm()}}
 function fitDxf(){const b=$('dxfBox'),[x0,y0,x1,y1]=ext,pad=Math.max(x1-x0,y1-y0)*.06,w=x1-x0+2*pad,h=y1-y0+2*pad,ar=b.clientWidth/Math.max(b.clientHeight,1);
   let vw=w,vh=h;if(w/h<ar)vw=h*ar;else vh=w/ar;vb=[(x0+x1)/2-vw/2,-(y0+y1)/2-vh/2,vw,vh];setVb()}
 $('dxfFit').onclick=()=>ext&&fitDxf();
-$('dxfM').onclick=()=>{dMeas=!dMeas;$('dxfM').classList.toggle('on',dMeas);$('dxfM').setAttribute('aria-pressed',dMeas);dPts=[];drawDm();dOutMsg();$('dxfBox').style.cursor=dMeas?'crosshair':''};
+$('dxfM').onclick=()=>{dMeas=!dMeas;dRes=null;$('dxfM').classList.toggle('on',dMeas);$('dxfM').setAttribute('aria-pressed',dMeas);dPts=[];drawDm();dOutMsg();$('dxfBox').style.cursor=dMeas?'crosshair':''};
 const dbx=$('dxfBox');let drag=null;
 function zoomAt(f,cx,cy){const r=dbx.getBoundingClientRect();cx??=r.left+r.width/2;cy??=r.top+r.height/2;const px=vb[0]+(cx-r.left)/r.width*vb[2],py=vb[1]+(cy-r.top)/r.height*vb[3];vb=[px-(px-vb[0])*f,py-(py-vb[1])*f,vb[2]*f,vb[3]*f];setVb()}
 $('dIn').onclick=()=>vb&&zoomAt(1/1.4);$('dOut2').onclick=()=>vb&&zoomAt(1.4);
@@ -568,10 +634,29 @@ dbx.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;dra
 dbx.addEventListener('pointermove',e=>{if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,[e.clientX,e.clientY]);
   if(pinch&&ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(d>0){zoomAt(pinch/d,(a[0]+b[0])/2,(a[1]+b[1])/2);pinch=d}return}
   if(!drag||!vb)return;const r=dbx.getBoundingClientRect();vb[0]=drag[2]-(e.clientX-drag[0])/r.width*vb[2];vb[1]=drag[3]-(e.clientY-drag[1])/r.height*vb[3];setVb()});
+let dRes=null;
+function dPick(e){const p=PARTS.find(x=>x.k===sel);if(!p||!p.g||!vb)return null;const r=dbx.getBoundingClientRect(),px=r.width/vb[2],x=vb[0]+(e.clientX-r.left)/px,y=-(vb[1]+(e.clientY-r.top)/px);
+  let best=null,bd=12;for(const q of snaps){const d=Math.hypot(q[0]-x,q[1]-y)*px;if(d<bd){bd=d;best={kind:'point',pt:q}}}if(best)return best;
+  let bc=null,bcd=8;for(const c of p.g.circles){const d=Math.abs(Math.hypot(c.x-x,c.y-y)-c.r)*px;if(d<bcd){bcd=d;bc=c}}if(bc)return {kind:'hole',c:bc};
+  let bs=null,bsd=8;for(const q of p.g.polys)for(let i=0;i<q.p.length-1;i++){const A=q.p[i],B=q.p[i+1],dx=B[0]-A[0],dy=B[1]-A[1],t=Math.max(0,Math.min(1,((x-A[0])*dx+(y-A[1])*dy)/(dx*dx+dy*dy||1))),d=Math.hypot(A[0]+t*dx-x,A[1]+t*dy-y)*px;if(d<bsd){bsd=d;bs={q,i}}}
+  if(!bs)return {kind:'point',pt:[x,y],free:true};
+  const q=bs.q;if(q.p.length>2&&q.p.length!==3||q.p.length>3){const A=q.p[0],B=q.p[Math.floor(q.p.length/2)],C=q.p[q.p.length-1],a=Math.hypot(B[0]-C[0],B[1]-C[1]),b=Math.hypot(A[0]-C[0],A[1]-C[1]),c=Math.hypot(A[0]-B[0],A[1]-B[1]),ar=Math.abs((B[0]-A[0])*(C[1]-A[1])-(C[0]-A[0])*(B[1]-A[1]))/2;
+    if(ar>1e-6&&q.p.length>4)return {kind:'arc',q,r:a*b*c/(4*ar)}}
+  const A=q.p[bs.i],B=q.p[bs.i+1];return {kind:'line',seg:[A,B],len:Math.hypot(B[0]-A[0],B[1]-A[1]),bend:q.b}}
+const dDesc=h=>h.kind==='hole'?`Hole Ø ${f2(h.c.r*2)} mm`:h.kind==='arc'?`Arc R ${f2(h.r)} mm`:h.kind==='line'?`${h.bend?'Bend line':'Edge'} ${f2(h.len)} mm`:h.free?'Point':'Corner / centre point';
+function dShape(h,cls){const s=vb[2]/dbx.clientWidth;if(!h)return '';
+  if(h.kind==='point')return `<circle cx="${h.pt[0]}" cy="${-h.pt[1]}" r="${s*6}" class="${cls}f"/>`;
+  if(h.kind==='hole')return `<circle cx="${h.c.x}" cy="${-h.c.y}" r="${h.c.r}" class="${cls}" stroke-width="3"/>`;
+  const pts=h.kind==='arc'?h.q.p:h.seg;return `<path d="M${pts.map(p=>p[0]+' '+(-p[1])).join('L')}" class="${cls}" stroke-width="3"/>`}
+const dTip=document.createElement('div');dTip.className='mtip';dbx.parentNode.appendChild(dTip);
+dbx.addEventListener('pointermove',e=>{if(!dMeas||e.buttons||pinch)return;const h=dPick(e),g=$('dh');if(!g)return;g.innerHTML=h?dShape(h,'hv'):'';
+  if(!h){dTip.style.display='none';return}const r=dbx.getBoundingClientRect(),pr=dbx.parentNode.getBoundingClientRect();
+  dTip.textContent=dDesc(h)+(h.kind==='point'?(dPts.length===1?' — click to finish the distance':' — click to start a distance'):' — click to measure');dTip.style.display='block';dTip.style.left=(e.clientX-pr.left+14)+'px';dTip.style.top=(e.clientY-pr.top+14)+'px'});
+dbx.addEventListener('pointerleave',()=>{const g=$('dh');if(g)g.innerHTML='';dTip.style.display='none'});
 dbx.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;drag=null;return}const d=drag;drag=null;if(!d||!dMeas||Math.hypot(e.clientX-d[0],e.clientY-d[1])>6)return;
-  const r=dbx.getBoundingClientRect(),px=r.width/vb[2],x=vb[0]+(e.clientX-r.left)/px,y=-(vb[1]+(e.clientY-r.top)/px);
-  let best=[x,y],bd=16;for(const s of snaps){const dd=Math.hypot(s[0]-x,s[1]-y)*px;if(dd<bd){bd=dd;best=s}}
-  if(dPts.length===2)dPts=[];dPts.push(best);drawDm();dOutMsg()});
+  const h=dPick(e);if(!h)return;
+  if(h.kind==='point'){if(dPts.length!==1){dPts=[];dRes=null}dPts.push(h.pt);drawDm();dOutMsg();return}
+  dPts=[];dRes=h;drawDm();const o=$('dOut');if(o)o.innerHTML=`<b>${dDesc(h)}</b>`});
 const roD=new ResizeObserver(()=>{if(tab==='dxf'&&ext)fitDxf()});roD.observe(dbx);
 }
 }
