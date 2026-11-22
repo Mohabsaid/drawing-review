@@ -290,7 +290,7 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
   const keys=new Set(PARTS.map(p=>p.k));
   for(const f of P.pdf){if(isMain(f.name)){MAIN_PDF=MAIN_PDF||f;continue}
-    const tk=tokens(f.name);const hit=PARTS.find(p=>tk[tk.length-1]===p.k||tk[0]===p.k);if(hit&&!hit.pdfMeta)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}
+    const tk=tokens(f.name);const hit=PARTS.find(p=>tk[0]===p.k)||(/qty/i.test(f.name)?null:PARTS.find(p=>tk[tk.length-1]===p.k));if(hit&&!hit.pdfMeta)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}
   stepMeta=P.steps[0]||null;
   $('pSub').textContent=`${PARTS.length} parts · ${PARTS.reduce((s,p)=>s+(p.qty||0),0)} pieces · model ${stepMeta?stepMeta.name:'missing'}`;
   sel=PARTS[0]?.k||null;renderRail();renderReview();
