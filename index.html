@@ -41,8 +41,8 @@ aside{border-right:1px solid var(--line)}
 .tool>*{pointer-events:auto;background:var(--bg)}
 .tool label{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:0 10px;min-height:40px;font-size:14px}
 .hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:var(--mute);background:var(--bg);padding:2px 6px}
-.mlabel{position:absolute;transform:translate(-50%,-140%);background:var(--red);color:#fff;font-weight:600;font-size:13px;padding:2px 8px;pointer-events:none;display:none;white-space:nowrap}
-.mout{position:absolute;left:12px;right:12px;bottom:34px;font-size:14px;pointer-events:none}.mout span:not(:empty){background:var(--bg);padding:3px 6px}
+.mlabel{position:absolute;transform:translate(-50%,-140%);background:#ffd400;color:#111;font-weight:600;font-size:13px;padding:2px 8px;pointer-events:none;display:none;white-space:nowrap}
+.mout{position:absolute;left:12px;right:12px;top:64px;font-size:15px;pointer-events:none;z-index:2}.mout span:not(:empty){display:inline-block;margin-top:4px}.mout span:not(:empty){background:var(--bg);padding:3px 6px}
 #pdfBox,#dxfBox{position:absolute;inset:56px 0 0 0;overflow:auto;background:var(--soft)}
 #pdfBox canvas{display:block;margin:12px auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15)}
 #dxfBox{overflow:hidden;cursor:grab;touch-action:none}#dxfBox svg{width:100%;height:100%;display:block}
@@ -90,7 +90,7 @@ textarea{min-height:84px;resize:vertical}
 .plist a{display:flex;justify-content:space-between;gap:12px;padding:16px 0;border-bottom:1px solid var(--line);text-decoration:none;font-weight:600;font-size:17px}
 .plist a span{color:var(--mute);font-weight:400;font-size:14px;white-space:nowrap}
 @media(max-width:1100px){main{grid-template-columns:200px minmax(0,1fr)}.review{grid-column:1/-1;border-left:0;border-top:1.5px solid var(--ink)}}
-@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}aside{border-right:0}#rail{display:flex;overflow-x:auto}.part{min-width:190px;border-right:1px solid var(--line)}.rail-h{display:none}.pane{min-height:430px}.tool button{padding:0 10px}.tool label{padding:0 8px}.hint{display:none}.mout{bottom:8px}.facts{left:12px;right:12px;max-width:none}}
+@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}aside{border-right:0}#rail{display:flex;overflow-x:auto}.part{min-width:190px;border-right:1px solid var(--line)}.rail-h{display:none}.pane{min-height:430px}.tool button{padding:0 10px}.tool label{padding:0 8px}.hint{display:none}.mout{top:110px}.facts{left:12px;right:12px;max-width:none}}
 @media(prefers-reduced-motion:reduce){.bar i{animation:none;width:100%}}
 </style>
 </head>
@@ -449,19 +449,19 @@ $('explode').oninput=explode;$('explode').onchange=()=>view(curView);$('isolate'
 $('single').onchange=()=>{if(single()&&!one)one=meshes.find(m=>m.userData.part===sel)||null;$('explode').disabled=single();paint3d();explode();view(curView)};
 $('fit').onclick=()=>view(curView);$('vIso').onclick=()=>view(curView='iso');$('vTop').onclick=()=>view(curView='top');$('vFront').onclick=()=>view(curView='front');
 $('mBtn').onclick=()=>{measOn=!measOn;$('mBtn').classList.toggle('on',measOn);$('mBtn').setAttribute('aria-pressed',measOn);clearMeas();R.domElement.style.cursor=measOn?'crosshair':''};
-function clearMeas(){mPts=[];mGroup.clear();$('mOut').textContent=measOn?'Measure: tap the first point (snaps to corners and edges)':''}
+function clearMeas(){mPts=[];mGroup.clear();$('mOut').textContent=measOn?'Measure is on — click the first point on the model (it snaps to corners and edges)':''}
 function addPt(hit,sx,sy){const m=hit.object,r=R.domElement.getBoundingClientRect(),pos=m.geometry.attributes.position,f=hit.face;
   const vs=[f.a,f.b,f.c].map(i=>new THREE.Vector3().fromBufferAttribute(pos,i)),cands=[...vs];for(let i=0;i<3;i++)cands.push(vs[i].clone().add(vs[(i+1)%3]).multiplyScalar(.5));
   let best=m.worldToLocal(hit.point.clone()),bd=16;
   for(const c of cands){const w=m.localToWorld(c.clone()).project(cam),px=Math.hypot((w.x+1)/2*r.width-sx,(1-w.y)/2*r.height-sy);if(px<bd){bd=px;best=c.clone()}}
   const w=m.localToWorld(best.clone());mPts.push({l:best,w});
-  const dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius*0.006,1.2),16,12),new THREE.MeshBasicMaterial({color:0xe4002b,depthTest:false}));dot.position.copy(w);dot.renderOrder=9;mGroup.add(dot);
-  if(mPts.length===1){$('mOut').textContent='Measure: tap the second point';return}
-  const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mPts[0].w,mPts[1].w]),new THREE.LineBasicMaterial({color:0xe4002b,depthTest:false}));ln.renderOrder=9;mGroup.add(ln);
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius*0.008,1.5),16,12),new THREE.MeshBasicMaterial({color:0xffd400,depthTest:false}));dot.position.copy(w);dot.renderOrder=9;mGroup.add(dot);
+  if(mPts.length===1){$('mOut').textContent='Now click the second point';return}
+  const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mPts[0].w,mPts[1].w]),new THREE.LineBasicMaterial({color:0xffd400,depthTest:false}));ln.renderOrder=9;mGroup.add(ln);
   const d=mPts[1].l.clone().sub(mPts[0].l);lbl.textContent=f2(d.length())+' mm';
   $('mOut').innerHTML=`Distance <b>${f2(d.length())} mm</b> · ΔX ${f2(Math.abs(d.x))} · ΔY ${f2(Math.abs(d.y))} · ΔZ ${f2(Math.abs(d.z))}`}
 let down=null;R.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
-R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;const r=R.domElement.getBoundingClientRect();
+R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>8)return;const r=R.domElement.getBoundingClientRect();
   const ray=new THREE.Raycaster();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
   const vis=single()?shown():($('isolate').checked?meshes.filter(m=>m.userData.part===sel):meshes);const hit=ray.intersectObjects(vis,false)[0];if(!hit)return;
   if(measOn){if(mPts.length===2)clearMeas();addPt(hit,e.clientX-r.left,e.clientY-r.top);return}
