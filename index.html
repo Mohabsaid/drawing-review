@@ -332,6 +332,7 @@ function mapBodies(){if(!meshes.length)return;
   pairs.sort((x,y)=>x.cnt-y.cnt||x.err-y.err);
   for(const x of pairs){if(x.g.part||x.p.matchErr!=null)continue;x.g.part=x.p.k;x.p.matchErr=x.err;for(const m of x.g.ms)m.userData.part=x.p.k}
   for(const p of PARTS)p.bodies=meshes.filter(m=>m.userData.part===p.k).length;
+  window.__rv={parts:PARTS.map(p=>({k:p.k,qty:p.qty,t:p.t,flat:p.fa&&p.fa.area,open:p.fa&&p.fa.open,target:p.fa&&p.fa.area*p.t,err:p.matchErr,n:p.bodies})),groups:groups.map(g=>({vol:Math.round(g.vol),area:Math.round(g.area),n:g.ms.length,part:g.part}))};
 }
 
 /* ---------- pre-checks ---------- */
