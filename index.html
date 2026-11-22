@@ -367,7 +367,7 @@ function mapBodies(){if(!meshes.length)return;
     const c=groups.filter(g=>!g.part&&g.ms.length===p.qty&&g.vol>tg*0.4&&g.vol<tg*2.5).sort((a,b)=>Math.abs(a.vol-tg)-Math.abs(b.vol-tg))[0];
     if(c){c.part=p.k;p.matchErr=Math.abs(c.vol-tg)/tg;p.guess=true;if(!p.t)p.tModel=c.t;for(const m of c.ms)m.userData.part=p.k}}
   for(const p of PARTS)p.bodies=meshes.filter(m=>m.userData.part===p.k).length;
-  window.__rv={parts:PARTS.map(p=>({k:p.k,qty:p.qty,t:p.t,flat:p.fa&&p.fa.area,open:p.fa&&p.fa.open,target:p.fa&&p.fa.area*p.t,err:p.matchErr,n:p.bodies})),groups:groups.map(g=>({vol:Math.round(g.vol),area:Math.round(g.area),n:g.ms.length,part:g.part}))};
+  window.__rv={parts:PARTS.map(p=>({k:p.k,qty:p.qty,t:p.t,flat:p.fa&&p.fa.area,open:p.fa&&p.fa.open,target:p.fa&&p.fa.area*p.t,err:p.matchErr,n:p.bodies})),groups:groups.map(g=>({vol:Math.round(g.vol),area:Math.round(g.area),n:g.ms.length,part:g.part,m:g.ms.map(m=>[+m.userData.vol.toFixed(1),+m.userData.area.toFixed(1),m.userData.dims.map(d=>+d.toFixed(1)).join('x')])}))};
 }
 
 /* ---------- pre-checks ---------- */
