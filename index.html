@@ -141,7 +141,7 @@ async function scanProject(id){const meta=await folderMeta(id);
 let active=0;const queue=[];const slot=()=>new Promise(ok=>{if(active<3){active++;ok()}else queue.push(ok)}),free=()=>{const n=queue.shift();if(n)n();else active--};
 const VER={};// id -> modifiedTime, filled when the folder is scanned
 async function media(id){const key='https://cache.local/'+id+'@'+(VER[id]||0);let c=null;try{c=await caches.open('drawing-review-v1');const hit=await c.match(key);if(hit)return new Uint8Array(await hit.arrayBuffer())}catch(e){}
-  await slot();try{let b;try{b=await gfetch(G+'/'+id+'?alt=media')}catch(e){if(/reach Google Drive/.test(e.message))throw new Error('Google Drive is limiting downloads from this network for a few minutes (too many requests). Wait 5–10 minutes and reload the page.');throw e}
+  await slot();try{let b;try{try{b=await gfetch('https://www.googleapis.com/download/drive/v3/files/'+id+'?alt=media')}catch(e1){b=await gfetch(G+'/'+id+'?alt=media')}}catch(e){if(/reach Google Drive/.test(e.message))throw new Error('Google Drive is limiting downloads from this network for a few minutes (too many requests). Wait 5–10 minutes and reload the page.');throw e}
     try{if(c)await c.put(key,new Response(b.slice()))}catch(e){}return b}finally{free()}}
 const fileBytes=id=>media(id),fileText=async id=>new TextDecoder('latin1').decode(await media(id));
 function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
