@@ -251,8 +251,9 @@ function flatArea(g){const key=p=>Math.round(p[0]*50)+','+Math.round(p[1]*50),ad
       const nx=(adj.get(key(end))||[]).find(j=>!used.has(j));if(nx===undefined)break;used.add(nx);const s=g.segs[nx];pts.push(key(s[0])===key(end)?s[1]:s[0])}
     if(ok){let a=0;for(let k=0;k<pts.length-1;k++)a+=pts[k][0]*pts[k+1][1]-pts[k+1][0]*pts[k][1];loops.push(Math.abs(a)/2)}else open++}
   const holes=g.circles.filter(c=>!c.b).reduce((s,c)=>s+Math.PI*c.r*c.r,0);
-  if(!loops.length)return {area:null,open};
-  loops.sort((a,b)=>b-a);return {area:loops[0]-loops.slice(1).reduce((s,x)=>s+x,0)-holes,open}}
+  let area=null;if(loops.length){loops.sort((a,b)=>b-a);area=loops[0]-loops.slice(1).reduce((s,x)=>s+x,0)-holes}
+  if(!(area>0)||open){const e=extents(g),bb=(e[2]-e[0])*(e[3]-e[1])-holes;if(!(area>0)||open&&Math.abs(area-bb)/bb>0.15)area=bb>0?bb:null}
+  return {area,open}}
 function extents(g){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const up=(x,y)=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)};
   for(const p of g.polys)for(const q of p.p)up(q[0],q[1]);for(const c of g.circles){up(c.x-c.r,c.y-c.r);up(c.x+c.r,c.y+c.r)}return [x0,y0,x1,y1]}
 
@@ -328,7 +329,7 @@ function mapBodies(){if(!meshes.length)return;
   const free=meshes.filter(m=>!m.userData.part);groups=[];
   for(const m of free){const u=m.userData;const g=groups.find(g=>Math.abs(g.vol-u.vol)/u.vol<0.004&&Math.abs(g.area-u.area)/u.area<0.006);if(g)g.ms.push(m);else groups.push({vol:u.vol,area:u.area,ms:[m]})}
   const todo=PARTS.filter(p=>!meshes.some(m=>m.userData.part===p.k)&&p.fa&&p.fa.area&&p.t),pairs=[];
-  for(const p of todo)for(const g of groups){const err=Math.abs(g.vol-p.fa.area*p.t)/(p.fa.area*p.t);if(err<0.08)pairs.push({p,g,err,cnt:g.ms.length===p.qty?0:1})}
+  for(const p of todo)for(const g of groups){const tg=p.fa.area*p.t;if(!(tg>0))continue;const err=Math.abs(g.vol-tg)/tg;if(err<0.08)pairs.push({p,g,err,cnt:g.ms.length===p.qty?0:1})}
   pairs.sort((x,y)=>x.cnt-y.cnt||x.err-y.err);
   for(const x of pairs){if(x.g.part||x.p.matchErr!=null)continue;x.g.part=x.p.k;x.p.matchErr=x.err;for(const m of x.g.ms)m.userData.part=x.p.k}
   for(const p of PARTS)p.bodies=meshes.filter(m=>m.userData.part===p.k).length;
@@ -374,7 +375,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.nice&&sz?' · flat '+sz:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.nice&&sz?' · flat '+sz:''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?`<br><b style="color:var(--red)">${p.bodies?'Model has '+p.bodies+' pcs':'Not found in the 3D model'}</b>`:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
