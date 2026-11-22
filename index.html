@@ -183,20 +183,20 @@ function startProject(){
 $('app').innerHTML=`
 <header>
   <div><div class="sub"><a href="${esc(APP_URL)}">Open another folder</a></div><h1 id="pName">Loading…</h1><div class="sub" id="pSub"></div></div>
-  <div class="release"><div><div class="big" id="cntBig">–</div><div class="sub">parts approved on the current files</div></div><div class="stamp no" id="stamp">Not released for fabrication</div></div>
+  <div class="release"><div class="stamp no" id="stamp">Not approved yet</div></div>
 </header>
 <main>
   <aside><div class="rail-h">Parts — click to review</div><div id="rail"></div></aside>
   <section class="center">
     <div class="tabs" id="tabs">
-      <button data-t="3d" class="on">3D model</button><button data-t="pdf">Drawing (PDF)</button><button data-t="dxf">Flat pattern (DXF)</button><button data-t="chk">Pre-checks<span class="cnt" id="issueCnt"></span></button>
+      <button data-t="3d" class="on">3D model</button><button data-t="pdf">Drawing (PDF)</button><button data-t="dxf">Flat pattern (DXF)</button>
     </div>
     <div class="pane show" id="p-3d">
       <div id="three"></div>
       <div class="tool">
         <label>Explode <input type="range" id="explode" min="0" max="100" value="0" aria-label="Explode distance"></label>
         <label><input type="checkbox" id="isolate"> Selected only</label>
-        <label><input type="checkbox" id="single"> One piece</label>
+        <label><input type="checkbox" id="single"> Isolate</label>
         <button id="mBtn" aria-pressed="false">Measure</button><button id="fit">Fit</button><button id="vIso">Iso</button><button id="vTop">Top</button><button id="vFront">Front</button>
       </div>
       <div class="mlabel" id="mLabel"></div>
@@ -212,7 +212,6 @@ $('app').innerHTML=`
       <div class="tool"><button id="dxfFit">Fit</button><button id="dxfM" aria-pressed="false">Measure</button><button id="dIn" aria-label="Zoom in">+</button><button id="dOut2" aria-label="Zoom out">−</button></div>
       <div id="dxfBox"></div><div class="facts" id="dxfFacts"></div>
     </div>
-    <div class="pane" id="p-chk"><div id="checks"></div></div>
   </section>
   <section class="review" id="review"></section>
 </main>`;
@@ -302,7 +301,7 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
       build3d(res.meshes);
     }catch(e){loadMsg('3D model: '+e.message);P.stepErr=e.message}}
   else loadMsg((P.cad&&P.cad.length?'Only SolidWorks files found. ':'')+'Add a STEP export of the model to the project folder to see it in 3D.');
-  mapBodies();runChecks();renderRail();renderReview();paint3d();
+  mapBodies();renderRail();renderReview();paint3d();
   if(meshes.length){$('load3d').classList.add('hide');view('iso')}
 })();
 
@@ -355,66 +354,63 @@ function runChecks(){const C=[];const add=(s,t,p,k)=>C.push({s,t,p,k});
 }
 
 /* ---------- status ---------- */
-const bundle=p=>[p.pdfMeta?p.pdfMeta.id+'@'+p.pdfMeta.updated:'-',p.dxfMeta.id+'@'+p.dxfMeta.updated,stepMeta?stepMeta.id+'@'+stepMeta.updated:'-'].join('|');
-function statusOf(p){const ev=reviews.filter(e=>e.part===p.k&&e.decision!=='comment').sort((a,b)=>a.at<b.at?1:-1);
-  if(!ev.length)return {s:'pending',label:'Pending review'};const l=ev[0];
-  if(l.bundle!==bundle(p))return {s:'stale',label:'Files changed since last review — re-review needed'};
-  return l.decision==='approve'?{s:'approved',label:'Approved'}:{s:'rejected',label:'Changes requested'}}
+const allFiles=()=>[stepMeta,...PARTS.flatMap(p=>[p.pdfMeta,p.dxfMeta]),MAIN_PDF].filter(Boolean);
+const bundle=()=>{const str=allFiles().map(m=>m.id+'@'+m.updated).sort().join('|');let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))>>>0;return h.toString(36)};
+function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
+  if(!l)return {s:'pending',label:'Waiting for review'};
+  if(l.bundle!==bundle())return {s:'stale',label:'Files changed since the last review — review again'};
+  return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
-  $('rail').innerHTML=PARTS.map(p=>{const st=statusOf(p),sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}, ${esc(st.label)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span class="dot ${st.s}" title="${esc(st.label)}"></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm</span></button>`}).join('');
-  const n=PARTS.filter(p=>statusOf(p).s==='approved').length;$('cntBig').textContent=n+' / '+PARTS.length;
-  const st=$('stamp');if(PARTS.length&&n===PARTS.length){st.textContent='Released for fabrication';st.className='stamp'}
-  else{const r=PARTS.filter(p=>['rejected','stale'].includes(statusOf(p).s)).length;st.textContent=r?`Not released · ${r} part${r>1?'s':''} need changes`:'Not released for fabrication';st.className='stamp no'}}
+  $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
+    return `<button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm</span></button>`}).join('');
+  const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 
 /* ---------- review panel (decision is sent by WhatsApp / email) ---------- */
 const fmtT=t=>new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 function msg(t,err){const m=$('msg');if(m){m.textContent=t;m.className='msg'+(err?' err':'')}}
-function renderReview(){const p=PARTS.find(x=>x.k===sel);const R=$('review');
-  if(!p){R.innerHTML='<p class="empty">No parts to review.</p>';return}
-  const st=statusOf(p),ev=reviews.filter(e=>e.part===p.k).sort((a,b)=>a.at<b.at?1:-1);
-  const dest=[WA?'WhatsApp':'',TO?'email':''].filter(Boolean).join(' or ');
-  R.innerHTML=`<div><h2>Part ${esc(p.k)}</h2><div class="sub">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · thickness ${p.t??'?'} mm${p.bodies!=null&&meshes.length?' · '+p.bodies+' in model':''}</div></div>
+function renderReview(){const R=$('review');
+  if(!P){R.innerHTML='';return}
+  const st=projStatus(),ev=reviews.slice().sort((a,b)=>a.at<b.at?1:-1),dest=[WA?'WhatsApp':'',TO?'email':''].filter(Boolean).join(' or ');
+  const pieces=PARTS.reduce((s,p)=>s+(p.qty||0),0);
+  R.innerHTML=`<div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
-   <div class="files"><div><span>${esc(p.pdfMeta?p.pdfMeta.name:'No drawing PDF')}</span></div><div><span>${esc(p.dxfMeta.name)}</span></div><div><span>${esc(stepMeta?stepMeta.name:'No STEP')}</span></div></div>
    <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
-   <textarea id="note" placeholder="Comment — what needs to change?${WA?' (or send a voice note in WhatsApp)':''}"></textarea>
-   <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
-   <div class="sub">${dest?`Your decision opens in ${dest} as a ready message with the exact file versions — just press Send.${WA?' For a voice note, record it in that WhatsApp chat.':''}`:'Your decision is prepared as a message — copy it and send it to the designer.'}</div>
+   <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':''}"></textarea>
+   <div class="row2 acts"><button class="ap" id="bAp">Approve project</button><button class="rj" id="bRj">Request changes</button></div>
+   <div class="sub">${dest?`Your decision opens in ${dest} as a ready message listing every file and its version — just press Send.${WA?' For a voice note, record it in that WhatsApp chat.':''}`:'Your decision is prepared as a message — copy it and send it to the designer.'}</div>
    <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
    <h2>Your decisions on this device</h2>
-   <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Approved':'Changes requested'}</span> · <b>${esc(e.name)}</b><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle(p)?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
+   <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Project approved':'Changes requested'}</span> · <b>${esc(e.name)}</b><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle()?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
   $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');
 }
 function fileLine(m){return m?`${m.name} (${fmtT(m.updated)})`:'—'}
-function decide(decision){const p=PARTS.find(x=>x.k===sel);
+function decide(decision){
   const name=$('rvName').value.trim(),note=$('note').value.trim();
   if(!name){msg('Write your name first.',1);$('rvName').focus();return}
   if(decision==='reject'&&!note&&!WA){msg('Write what needs to change.',1);$('note').focus();return}
   ls.set('rv_name',name);
-  const was=statusOf(p).s;reviews.push({part:p.k,decision,name,note,bundle:bundle(p),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
-  const all=PARTS.every(x=>statusOf(x).s==='approved');
-  const text=[(decision==='approve'?'✅ APPROVED':'❌ CHANGES REQUESTED')+` — ${P.name} — Part ${p.k}`,
+  reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
+  const text=[(decision==='approve'?'✅ PROJECT APPROVED for fabrication':'❌ CHANGES REQUESTED')+` — ${P.name}`,
     `By: ${name}`,`Time: ${fmtT(Date.now())}`,
     note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
-    `Files reviewed:`,`• Drawing: ${fileLine(p.pdfMeta)}`,`• Flat: ${fileLine(p.dxfMeta)}`,`• Model: ${fileLine(stepMeta)}`,
-    all&&decision==='approve'&&was!=='approved'?`\nAll ${PARTS.length} parts are now approved — released for fabrication.`:'',
+    `Files reviewed (${allFiles().length}):`,`• Model: ${fileLine(stepMeta)}`,
+    ...PARTS.map(p=>`• Part ${p.k} (Qty ${p.qty??'?'}): ${fileLine(p.pdfMeta)} + ${fileLine(p.dxfMeta)}`),
+    MAIN_PDF?`• Main views: ${fileLine(MAIN_PDF)}`:'',
     `Review page: ${location.href}`].filter(Boolean).join('\n');
-  const subj=(decision==='approve'?'[APPROVED] ':'[CHANGES REQUESTED] ')+P.name+' — Part '+p.k;
+  const subj=(decision==='approve'?'[APPROVED] ':'[CHANGES REQUESTED] ')+P.name;
   renderRail();renderReview();
   $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2">${WA?`<a class="btnl on" href="https://wa.me/${WA}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>`:''}${TO?`<a class="btnl" href="mailto:${encodeURIComponent(TO)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}">Email</a>`:''}<button id="cpMsg">Copy message</button></div>`;
   $('cpMsg').onclick=async()=>{try{await navigator.clipboard.writeText(text);$('cpMsg').textContent='Copied'}catch(e){msg('Copy failed — select the text manually.',1)}};
-  if(WA&&!TO)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
-  else if(TO&&!WA)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
-  msg(decision==='approve'?'Approved — now press Send in the message.':'Saved — now press Send in the message.');
+  if(!!WA!==!!TO)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
+  msg(decision==='approve'?'Project approved — now press Send in the message.':'Saved — now press Send in the message.');
 }
 
 /* ---------- tabs ---------- */
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;tab=b.dataset.t;
   for(const x of $('tabs').children)x.classList.toggle('on',x===b);
-  for(const id of ['3d','pdf','dxf','chk'])$('p-'+id).classList.toggle('show',id===tab);
+  for(const id of ['3d','pdf','dxf'])$('p-'+id).classList.toggle('show',id===tab);
   if(tab==='3d')resize3d();if(tab==='pdf')loadPdf();if(tab==='dxf')drawDxf()});
 function select(k,keep){sel=k;if(!keep)one=meshes.find(m=>m.userData.part===k)||null;renderRail();renderReview();clearMeas();paint3d();if(single())view(curView);if(tab==='pdf'){pdfMode='part';loadPdf()}if(tab==='dxf')drawDxf()}
 
