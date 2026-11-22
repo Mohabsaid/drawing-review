@@ -290,8 +290,10 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   try{let rc=JSON.parse(ls.get('rv_recent')||'[]').filter(x=>x.id!==P.id);rc.unshift({id:P.id,name:P.name,at:Date.now(),url:location.href});ls.set('rv_recent',JSON.stringify(rc.slice(0,12)))}catch(e){}try{reviews=JSON.parse(ls.get('rv_dec_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
   PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
   const keys=new Set(PARTS.map(p=>p.k));
-  for(const f of P.pdf){if(isMain(f.name)){MAIN_PDF=MAIN_PDF||f;continue}
-    const tk=tokens(f.name);const hit=PARTS.find(p=>tk[0]===p.k)||(/qty/i.test(f.name)?null:PARTS.find(p=>tk[tk.length-1]===p.k));if(hit&&!hit.pdfMeta)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}
+  {const strong=f=>{const b=f.name.replace(/\.[^.]+$/,''),m=b.match(/^(?:part|pt|p|st|sheet|item)[\s_.\-#]*([A-Za-z0-9]+)\b/i)||b.match(/[\s_\-](?:part|st)[\s_.\-#]*([A-Za-z0-9]+)\s*$/i);return m?m[1]:null};
+   const left=[];
+   for(const f of P.pdf){if(isMain(f.name)){MAIN_PDF=MAIN_PDF||f;continue}const k=strong(f),hit=k&&PARTS.find(p=>p.k.toLowerCase()===k.toLowerCase()&&!p.pdfMeta);if(hit)hit.pdfMeta=f;else left.push(f)}
+   for(const f of left){const tk=tokens(f.name);const hit=PARTS.find(p=>!p.pdfMeta&&tk[0]===p.k)||(/qty/i.test(f.name)?null:PARTS.find(p=>!p.pdfMeta&&tk[tk.length-1]===p.k));if(hit)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}}
   stepMeta=P.steps[0]||null;
   $('pSub').textContent=`${PARTS.length} parts · ${PARTS.reduce((s,p)=>s+(p.qty||0),0)} pieces · model ${stepMeta?stepMeta.name:'missing'}`;
   sel=PARTS[0]?.k||null;renderRail();renderReview();
@@ -328,10 +330,12 @@ function mapBodies(){if(!meshes.length)return;
   // 2) by geometry: identical bodies (same volume and surface area, whatever their angle), then volume ≈ flat area × thickness
   const free=meshes.filter(m=>!m.userData.part);groups=[];
   for(const m of free){const u=m.userData;const g=groups.find(g=>Math.abs(g.vol-u.vol)/u.vol<0.004&&Math.abs(g.area-u.area)/u.area<0.006);if(g)g.ms.push(m);else groups.push({vol:u.vol,area:u.area,ms:[m]})}
-  const todo=PARTS.filter(p=>!meshes.some(m=>m.userData.part===p.k)&&p.fa&&p.fa.area&&p.t),pairs=[];
-  for(const p of todo)for(const g of groups){const tg=p.fa.area*p.t;if(!(tg>0))continue;const err=Math.abs(g.vol-tg)/tg;if(err<0.08)pairs.push({p,g,err,cnt:g.ms.length===p.qty?0:1})}
+  const GA=[0.5,0.6,0.7,0.8,0.9,1,1.2,1.25,1.5,1.6,2,2.5,3,4,5,6,8,10,12];
+  for(const g of groups){const raw=2*g.vol/g.area,near=GA.reduce((a,b)=>Math.abs(b-raw)<Math.abs(a-raw)?b:a);g.t=Math.abs(near-raw)/near<0.15?near:+raw.toFixed(2)}
+  const todo=PARTS.filter(p=>!meshes.some(m=>m.userData.part===p.k)&&p.fa&&p.fa.area),pairs=[];
+  for(const p of todo)for(const g of groups){if(p.t&&Math.abs(g.t-p.t)/p.t>0.3)continue;const tg=p.fa.area*(p.t||g.t);if(!(tg>0))continue;const err=Math.abs(g.vol-tg)/tg;if(err<0.08)pairs.push({p,g,err,cnt:g.ms.length===p.qty?0:1})}
   pairs.sort((x,y)=>x.cnt-y.cnt||x.err-y.err);
-  for(const x of pairs){if(x.g.part||x.p.matchErr!=null)continue;x.g.part=x.p.k;x.p.matchErr=x.err;for(const m of x.g.ms)m.userData.part=x.p.k}
+  for(const x of pairs){if(x.g.part||x.p.matchErr!=null)continue;x.g.part=x.p.k;x.p.matchErr=x.err;if(!x.p.t)x.p.tModel=x.g.t;for(const m of x.g.ms)m.userData.part=x.p.k}
   for(const p of PARTS)p.bodies=meshes.filter(m=>m.userData.part===p.k).length;
   window.__rv={parts:PARTS.map(p=>({k:p.k,qty:p.qty,t:p.t,flat:p.fa&&p.fa.area,open:p.fa&&p.fa.open,target:p.fa&&p.fa.area*p.t,err:p.matchErr,n:p.bodies})),groups:groups.map(g=>({vol:Math.round(g.vol),area:Math.round(g.area),n:g.ms.length,part:g.part}))};
 }
@@ -375,7 +379,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.nice&&sz?' · flat '+sz:''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?`<br><b style="color:var(--red)">${p.bodies?'Model has '+p.bodies+' pcs':'Not found in the 3D model'}</b>`:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t!=null?p.t+' mm':p.tModel?p.tModel+' mm (from model)':'? mm'}${p.nice&&sz?' · flat '+sz:''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?`<br><b style="color:var(--red)">${p.bodies?'Model has '+p.bodies+' pcs':'Not found in the 3D model'}</b>`:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
