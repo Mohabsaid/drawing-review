@@ -41,6 +41,7 @@ aside{border-right:1px solid var(--line)}
 #three{position:absolute;inset:0}
 .tool{position:absolute;left:12px;top:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:2}
 .tool>*{pointer-events:auto;background:var(--bg)}
+.tool label.sel{padding:0}.tool select{min-height:37px;border:0;background:transparent;font:inherit;font-size:14px;padding:0 8px;max-width:260px;color:inherit}
 .tool label{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:0 10px;min-height:40px;font-size:14px}
 .hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:var(--mute);background:var(--bg);padding:2px 6px}
 .mlabel{position:absolute;transform:translate(-50%,-140%);background:#ffd400;color:#111;font-weight:600;font-size:13px;padding:2px 8px;pointer-events:none;display:none;white-space:nowrap}
@@ -129,7 +130,7 @@ async function driveList(id){let out=[],pt='';do{const j=await gfetch(G+'?q='+en
 async function folderMeta(id){const m=await gfetch(G+'/'+id+'?fields=id,name,mimeType','json');if(m.mimeType!=='application/vnd.google-apps.folder')throw new Error('This link is a single file. Use the link of the FOLDER that holds the STEP, DXF and PDF files.');return m}
 async function scanProject(id){const meta=await folderMeta(id);
   const out={id,name:meta.name,steps:[],dxf:[],pdf:[],otherPdf:[],cad:[]},loose=[];let hasDraw=false;
-  const M=f=>({id:f.id,name:f.name,size:+f.size||0,updated:Date.parse(f.modifiedTime)});
+  const M=f=>{VER[f.id]=f.modifiedTime;return {id:f.id,name:f.name,size:+f.size||0,updated:Date.parse(f.modifiedTime)}};
   const walk=async(fid,path,depth)=>{const items=await driveList(fid),subs=[];
     for(const x of items){const n=x.name.toLowerCase();
       if(x.mimeType==='application/vnd.google-apps.folder'){if(x.name[0]==='_'||/superseded|old|archive/i.test(x.name))continue;if(/draw|pdf/i.test(x.name))hasDraw=true;if(depth<3)subs.push(x)}
@@ -137,7 +138,12 @@ async function scanProject(id){const meta=await folderMeta(id);
       else if(/\.pdf$/.test(n))(/draw|pdf/.test(path)?out.pdf:loose).push(M(x));else if(/\.(sldprt|sldasm|slddrw)$/.test(n))out.cad.push(x.name)}
     await Promise.all(subs.map(x=>walk(x.id,path+'/'+x.name.toLowerCase(),depth+1)))};
   await walk(id,'',0);if(hasDraw)out.otherPdf=loose;else out.pdf=out.pdf.concat(loose);out.steps.sort((a,b)=>b.updated-a.updated);return out}
-const fileBytes=id=>gfetch(G+'/'+id+'?alt=media'),fileText=id=>gfetch(G+'/'+id+'?alt=media','text');
+let active=0;const queue=[];const slot=()=>new Promise(ok=>{if(active<3){active++;ok()}else queue.push(ok)}),free=()=>{const n=queue.shift();if(n)n();else active--};
+const VER={};// id -> modifiedTime, filled when the folder is scanned
+async function media(id){const key='https://cache.local/'+id+'@'+(VER[id]||0);let c=null;try{c=await caches.open('drawing-review-v1');const hit=await c.match(key);if(hit)return new Uint8Array(await hit.arrayBuffer())}catch(e){}
+  await slot();try{let b;try{b=await gfetch(G+'/'+id+'?alt=media')}catch(e){if(/reach Google Drive/.test(e.message))throw new Error('Google Drive is limiting downloads from this network for a few minutes (too many requests). Wait 5–10 minutes and reload the page.');throw e}
+    try{if(c)await c.put(key,new Response(b.slice()))}catch(e){}return b}finally{free()}}
+const fileBytes=id=>media(id),fileText=async id=>new TextDecoder('latin1').decode(await media(id));
 function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
   if(!m){if(/\/file\/d\//.test(s))throw new Error('That is a link to a single file. Paste the link of the FOLDER.');throw new Error('Paste the link of a Google Drive folder (it contains /folders/).')}
   return {id:m[1],rk:(s.match(/resourcekey=([\w-]+)/)||[])[1]||''}}
@@ -150,35 +156,18 @@ if(/PASTE_/.test(API_KEY)){
 } else if(!PROJECT_ID) landing(); else startProject();
 
 function landing(){
-  $('app').innerHTML=`<header><div><h1>Drawing review</h1><div class="sub">Paste a Google Drive folder link, then send the review link to the engineer</div></div></header>
+  $('app').innerHTML=`<header><div><h1>Drawing review</h1><div class="sub">Paste a Google Drive folder link and press Open</div></div></header>
   <div class="upl panel">
-   <h2>Create a review link</h2>
-   <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders.</div>
-   <input type="text" id="lkUrl" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url">
-   <div class="sub" style="margin-top:6px">Where should the engineer's approvals and comments go?</div>
-   <div class="row2"><input type="tel" id="waNum" placeholder="Your WhatsApp, e.g. 201001234567" aria-label="Your WhatsApp number with country code" value="${esc(ls.get('rv_wa'))}"><input type="email" id="toMail" placeholder="Your email (optional)" aria-label="Your email" value="${esc(ls.get('rv_to'))}"></div>
-   <button id="lkGo" class="on" style="align-self:start">Create review link</button>
+   <div class="lkrow"><input type="text" id="lkUrl" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url"><button id="lkGo" class="on">Open</button></div>
+   <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders. Then send the page's link to the engineer.</div>
    <div class="msg" id="lkMsg"></div>
-   <div id="lkOut"></div>
   </div>
   <div class="plist"><h2 style="margin:8px 0 4px">Recent projects</h2><div id="pl"></div></div>`;
   let rc=[];try{rc=JSON.parse(ls.get('rv_recent')||'[]')}catch(e){}
   $('pl').innerHTML=rc.length?rc.map(p=>`<a href="${esc(p.url)}">${esc(p.name)}<span>${new Date(p.at).toLocaleDateString()}</span></a>`).join(''):'<p class="empty">Projects opened on this device show up here.</p>';
-  const go=async()=>{const M=$('lkMsg');M.className='msg';$('lkOut').innerHTML='';
+  const go=async()=>{const M=$('lkMsg');M.className='msg';
     let L;try{L=parseLink($('lkUrl').value)}catch(e){M.textContent=e.message;M.className='msg err';$('lkUrl').focus();return}
-    const wa=$('waNum').value.replace(/\D/g,''),to=$('toMail').value.trim();
-    if(wa&&wa.length<10){M.textContent='Write the WhatsApp number with the country code, e.g. 201001234567.';M.className='msg err';return}
-    if(to&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){M.textContent='That email doesn\'t look right.';M.className='msg err';return}
-    ls.set('rv_wa',wa);ls.set('rv_to',to);M.textContent='Checking the folder…';
-    try{const h={};if(L.rk)h['X-Goog-Drive-Resource-Keys']=L.id+'/'+L.rk;
-      const r=await fetch(G+'/'+L.id+'?fields=name,mimeType&supportsAllDrives=true&key='+encodeURIComponent(API_KEY),{headers:h});
-      if(!r.ok)throw new Error('Google Drive won\'t open this folder. Set its sharing to "Anyone with the link" and try again.');
-      const m=await r.json();if(m.mimeType!=='application/vnd.google-apps.folder')throw new Error('This link is a single file. Use the link of the FOLDER.');
-      const u=APP_URL+'?f='+L.id+(L.rk?'&rk='+L.rk:'')+(wa?'&wa='+wa:'')+(to?'&to='+encodeURIComponent(to):'');
-      M.textContent=`"${m.name}" is ready.`+(wa||to?'':' No WhatsApp or email given, so the engineer will copy his decision and send it himself.');
-      $('lkOut').innerHTML=`<div class="lkrow"><input type="text" id="outUrl" readonly value="${esc(u)}" aria-label="Review link"><button id="cp">Copy</button></div><p><a href="${esc(u)}">Open the review page</a></p>`;
-      $('cp').onclick=async()=>{try{await navigator.clipboard.writeText(u);$('cp').textContent='Copied'}catch(e){$('outUrl').select()}};
-    }catch(e){M.textContent=e.message;M.className='msg err'}};
+    M.textContent='Opening…';location.href=APP_URL+'?f='+L.id+(L.rk?'&rk='+L.rk:'')};
   $('lkGo').onclick=go;$('lkUrl').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
 }
 
@@ -209,7 +198,7 @@ $('app').innerHTML=`
       <div class="loading" id="load3d"><div id="loadMsg">Loading files from Drive…</div><div class="bar"><i></i></div></div>
     </div>
     <div class="pane" id="p-pdf">
-      <div class="tool"><button id="pdfMain">Main views</button><button id="pdfPart">Part sheet</button><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="zFit">Fit width</button><label id="pgL" style="display:none"></label></div>
+      <div class="tool"><label class="sel"><select id="pdfSel" aria-label="Choose a drawing"><option value="">All drawings…</option></select></label><button id="pdfMain">Main views</button><button id="pdfPart">Part sheet</button><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="zFit">Fit width</button><label id="pgL" style="display:none"></label></div>
       <div id="pdfBox"></div>
     </div>
     <div class="pane" id="p-dxf">
@@ -268,9 +257,9 @@ function extents(g){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const up=(x,y)=>{x0=Math.m
   for(const p of g.polys)for(const q of p.p)up(q[0],q[1]);for(const c of g.circles){up(c.x-c.r,c.y-c.r);up(c.x+c.r,c.y+c.r)}return [x0,y0,x1,y1]}
 
 /* ---------- names ---------- */
-function partFromDxf(m){const base=m.name.replace(/\.dxf$/i,'');const k=(base.match(/^\s*([A-Za-z0-9]+)/)||[])[1]||base;
+function partFromDxf(m){const base=m.name.replace(/\.dxf$/i,'');const nice=base.replace(/^\s*[A-Za-z0-9]+\s*[._\-)]?\s*/,'').replace(/[-_ ]*thickness.*$/i,'').replace(/[-_ ]*qty.*$/i,'').replace(/[_\s-]+$/,'').trim();const k=(base.match(/^\s*([A-Za-z0-9]+)/)||[])[1]||base;
   const q=base.match(/qty\s*[:=]?\s*(\d+)/i),t=base.match(/(\d+(?:\.\d+)?)\s*mm/i);
-  return {k,qty:q?+q[1]:null,t:t?+t[1]:null,rl:/R\s*&\s*L/i.test(base),dxfMeta:m}}
+  return {k,nice,qty:q?+q[1]:null,t:t?+t[1]:null,rl:/R\s*&\s*L/i.test(base),dxfMeta:m}}
 const tokens=n=>n.replace(/\.[^.]+$/,'').split(/[\s_.\-()]+/).filter(Boolean);
 const isMain=n=>/main|assembly|assy|general/i.test(n);
 
@@ -310,9 +299,12 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   renderRail();if(tab==='dxf')drawDxf();
   loadMsg('Loading drawings…');
   await initPdf();
-  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[]),...(P.extraPdf||[])].map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
+  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[]),...(P.extraPdf||[]),...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i).map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
     const pt=[];for(let n=1;n<=Math.min(doc.numPages,60);n++){const c=await (await doc.getPage(n)).getTextContent();pt.push(c.items.map(i=>i.str).join(' '))}pageTexts[m.id]=pt;m.text=pt.slice(0,3).join(' ')}catch(e){m.err=e.message}}));
   splitCombined();renderRail();
+  {const all=[...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i&&pdfDocs[m.id]);
+   $('pdfSel').innerHTML='<option value="">All drawings ('+all.length+')…</option>'+all.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${pdfDocs[m.id].numPages>1?' — '+pdfDocs[m.id].numPages+' pages':''}</option>`).join('');
+   $('pdfSel').onchange=()=>{const id=$('pdfSel').value;if(!id)return;pdfFile=all.find(m=>m.id===id);pdfMode='file';loadPdf()}}
   if(tab==='pdf')loadPdf();
   if(stepMeta){loadMsg('Loading 3D model ('+(stepMeta.size/1048576).toFixed(1)+' MB)…');
     try{const stepBytes=await fileBytes(stepMeta.id);loadMsg('Reading 3D model — first time can take ~10 s…');
@@ -383,7 +375,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.nice&&sz?' · flat '+sz:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
@@ -398,9 +390,9 @@ function renderReview(){const R=$('review');
   R.innerHTML=`<div id="sendc"></div><div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
    <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
-   <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':''}"></textarea>
+   <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
    <div class="row2 acts"><button class="ap" id="bAp">Approve project</button><button class="rj" id="bRj">Request changes</button></div>
-   <div class="sub">${dest?`Your decision opens in ${dest} as a ready message listing every file and its version — just press Send.${WA?' For a voice note, record it in that WhatsApp chat.':''}`:'Your decision is prepared as a message — copy it and send it to the designer.'}</div>
+   <div class="sub">After you press Approve or Request changes, choose WhatsApp or Email: your own app opens with a ready message listing every file — pick the designer and send. For a voice note, record it in that WhatsApp chat.</div>
    <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
    <h2>Your decisions on this device</h2>
@@ -444,7 +436,7 @@ function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.upda
 function decide(decision){
   const name=$('rvName').value.trim(),note=$('note').value.trim();
   if(!name){msg('Write your name first.',1);$('rvName').focus();return}
-  if(decision==='reject'&&!note&&!WA){msg('Write what needs to change.',1);$('note').focus();return}
+  
   ls.set('rv_name',name);
   reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
   const text=[(decision==='approve'?'✅ PROJECT APPROVED for fabrication':'❌ CHANGES REQUESTED')+` — ${P.name}`,
@@ -456,9 +448,9 @@ function decide(decision){
     `Review page: ${location.href}`].filter(Boolean).join('\n');
   const subj=(decision==='approve'?'[APPROVED] ':'[CHANGES REQUESTED] ')+P.name;
   renderRail();renderReview();
-  $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2">${WA?`<a class="btnl on" href="https://wa.me/${WA}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>`:''}${TO?`<a class="btnl" href="mailto:${encodeURIComponent(TO)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}">Email</a>`:''}<button id="cpMsg">Copy message</button></div>`;
+  $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2"><a class="btnl on" href="https://wa.me/${WA}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a><a class="btnl on" href="mailto:${encodeURIComponent(TO)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}">Email</a></div><button id="cpMsg">Copy message</button>`;
   $('cpMsg').onclick=async()=>{try{await navigator.clipboard.writeText(text);$('cpMsg').textContent='Copied'}catch(e){msg('Copy failed — select the text manually.',1)}};
-  if(!!WA!==!!TO)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
+  
   msg(decision==='approve'?'Project approved — now press Send in the message.':'Saved — now press Send in the message.');
 }
 
@@ -467,7 +459,7 @@ $('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   for(const x of $('tabs').children)x.classList.toggle('on',x===b);
   for(const id of ['3d','pdf','dxf'])$('p-'+id).classList.toggle('show',id===tab);
   if(tab==='3d')resize3d();if(tab==='pdf')loadPdf();if(tab==='dxf')drawDxf()});
-function select(k,keep){sel=k;if(!keep)one=meshes.find(m=>m.userData.part===k)||null;renderRail();renderReview();clearMeas();paint3d();if(single())view(curView);if(tab==='pdf'){pdfMode='part';loadPdf()}if(tab==='dxf')drawDxf()}
+function select(k,keep){sel=k;if(!keep)one=meshes.find(m=>m.userData.part===k)||null;renderRail();renderReview();clearMeas();paint3d();if(single())view(curView);if(tab==='pdf'){pdfMode='part';$('pdfSel').value='';loadPdf()}if(tab==='dxf')drawDxf()}
 
 /* ---------- 3D ---------- */
 const host=$('three');
@@ -589,9 +581,9 @@ R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-dow
 /* ---------- PDF ---------- */
 let pdfMode='part',zoom=0,pdfShown=null,pageNo=1;
 async function initPdf(){if(!window.pdfjsLib)return;try{const t=await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js')).text();pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([t],{type:'text/javascript'}))}catch(e){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}}
-function curPdf(){const p=PARTS.find(x=>x.k===sel);return pdfMode==='main'?MAIN_PDF:(p&&p.pdfMeta)}
+let pdfFile=null;function curPdf(){const p=PARTS.find(x=>x.k===sel);return pdfMode==='file'?pdfFile:pdfMode==='main'?MAIN_PDF:(p&&p.pdfMeta)}
 async function loadPdf(){const m=curPdf(),box=$('pdfBox');$('pdfMain').disabled=!MAIN_PDF;
-  if(!m){box.innerHTML='<p class="empty" style="padding:20px">'+(pdfMode==='main'?'No main-views drawing in the Drawings folder.':'No drawing PDF for this part.')+'</p>';return}
+  if(!m){box.innerHTML='<p class="empty" style="padding:20px">'+(pdfMode==='main'?'No main-views drawing in the Drawings folder.':'No sheet is linked to this part — pick any drawing from the "All drawings" list above.')+'</p>';return}
   if(!pdfDocs[m.id]){box.innerHTML='<p class="empty" style="padding:20px">'+(m.err?esc(m.err):'Loading drawing…')+'</p>';return}
   const key=m.id+'#'+(m.page||1);if(pdfShown!==key){pdfShown=key;zoom=0;pageNo=m.page||1}renderPdf()}
 async function renderPdf(){const m=curPdf();if(!m||!pdfDocs[m.id])return;const doc=pdfDocs[m.id],box=$('pdfBox'),pg=await doc.getPage(pageNo),v0=pg.getViewport({scale:1});
@@ -599,7 +591,7 @@ async function renderPdf(){const m=curPdf();if(!m||!pdfDocs[m.id])return;const d
   const c=document.createElement('canvas');c.width=v.width;c.height=v.height;c.style.width=(v.width/dpr)+'px';c.style.height=(v.height/dpr)+'px';
   await pg.render({canvasContext:c.getContext('2d'),viewport:v}).promise;box.innerHTML='';box.appendChild(c);
   const L=$('pgL');if(doc.numPages>1){L.style.display='flex';L.innerHTML=`<button id="pgP" aria-label="Previous page" style="border:0;min-height:36px">‹</button> Page ${pageNo} / ${doc.numPages} <button id="pgN" aria-label="Next page" style="border:0;min-height:36px">›</button>`;$('pgP').onclick=()=>{if(pageNo>1){pageNo--;renderPdf()}};$('pgN').onclick=()=>{if(pageNo<doc.numPages){pageNo++;renderPdf()}}}else L.style.display='none'}
-$('pdfMain').onclick=()=>{pdfMode='main';loadPdf()};$('pdfPart').onclick=()=>{pdfMode='part';loadPdf()};
+$('pdfMain').onclick=()=>{pdfMode='main';$('pdfSel').value='';loadPdf()};$('pdfPart').onclick=()=>{pdfMode='part';$('pdfSel').value='';loadPdf()};
 $('zIn').onclick=()=>{zoom=Math.min(zoom+1,6);renderPdf()};$('zOut').onclick=()=>{zoom=Math.max(zoom-1,-2);renderPdf()};$('zFit').onclick=()=>{zoom=0;renderPdf()};
 
 /* ---------- DXF view ---------- */
