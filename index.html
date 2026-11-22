@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing Review</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,800&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Drawing transmittal / sign-off sheet: white, black, signal red. */
+:root{--bg:#fff;--ink:#111;--mute:#6b6b6b;--line:#d9d9d9;--soft:#f3f3f3;--red:#e4002b}
+@media(prefers-color-scheme:dark){:root{--bg:#0e0e0e;--ink:#eee;--mute:#9a9a9a;--line:#2c2c2c;--soft:#181818}}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Archivo,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.big,.part .k{font-family:Archivo,system-ui,sans-serif;font-stretch:112%;font-weight:800;line-height:1.05;margin:0}
+h1{font-size:clamp(22px,3.2vw,36px);text-wrap:balance}h2{font-size:17px}
+a{color:inherit}
+button,textarea,input{font:inherit;color:inherit}
+button{min-height:40px;padding:0 14px;border:1.5px solid var(--ink);background:var(--bg);cursor:pointer;border-radius:0}
+button:focus-visible,textarea:focus-visible,input:focus-visible,.part:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+button.on{background:var(--ink);color:var(--bg)}button:disabled{opacity:.4;cursor:not-allowed}
+header{border-top:8px solid var(--ink);padding:16px max(3vw,14px) 12px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:end;justify-content:space-between}
+.sub{color:var(--mute);font-size:14px;margin-top:4px}
+.release{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.big{font-size:clamp(30px,4vw,46px)}
+.stamp{border:2px solid currentColor;padding:6px 10px;font-weight:600;font-size:13px;white-space:nowrap}.stamp.no{color:var(--red)}
+main{display:grid;grid-template-columns:230px minmax(0,1fr) 330px;border-top:1.5px solid var(--ink);min-height:calc(100vh - 110px)}
+aside{border-right:1px solid var(--line)}
+.rail-h{padding:12px 14px;font-size:13px;color:var(--mute);border-bottom:1px solid var(--line)}
+.part{display:grid;grid-template-columns:34px 1fr auto;gap:2px 10px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);width:100%;text-align:left;background:none;min-height:56px}
+.part .k{font-size:24px;grid-row:span 2}.part .n{font-weight:600;font-size:14px}.part .q{font-size:12px;color:var(--mute)}
+.part.sel{background:var(--soft);box-shadow:inset 4px 0 0 var(--ink)}
+.dot{width:12px;height:12px;border:2px solid var(--mute);border-radius:50%;grid-row:span 2}
+.dot.approved{background:var(--ink);border-color:var(--ink)}.dot.rejected{background:var(--red);border-color:var(--red)}.dot.stale{border-color:var(--red);border-style:dashed}
+.center{display:flex;flex-direction:column;min-height:540px}
+.tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{border:0;border-right:1px solid var(--line);min-height:44px}
+.cnt{display:inline-block;background:var(--red);color:#fff;font-size:11px;padding:0 6px;margin-left:6px;border-radius:9px}.cnt:empty{display:none}
+.pane{position:relative;flex:1;min-height:480px;display:none}.pane.show{display:block}
+#three{position:absolute;inset:0}
+.tool{position:absolute;left:12px;top:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:2}
+.tool>*{pointer-events:auto;background:var(--bg)}
+.tool label{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:0 10px;min-height:40px;font-size:14px}
+.hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:var(--mute);background:var(--bg);padding:2px 6px}
+.mlabel{position:absolute;transform:translate(-50%,-140%);background:var(--red);color:#fff;font-weight:600;font-size:13px;padding:2px 8px;pointer-events:none;display:none;white-space:nowrap}
+.mout{position:absolute;left:12px;right:12px;bottom:34px;font-size:14px;pointer-events:none}.mout span:not(:empty){background:var(--bg);padding:3px 6px}
+#pdfBox,#dxfBox{position:absolute;inset:56px 0 0 0;overflow:auto;background:var(--soft)}
+#pdfBox canvas{display:block;margin:12px auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15)}
+#dxfBox{overflow:hidden;cursor:grab;touch-action:none}#dxfBox svg{width:100%;height:100%;display:block}
+.geo line,.geo circle,.geo path{stroke:currentColor;stroke-width:1.3px;vector-effect:non-scaling-stroke;fill:none}.geo .bend{stroke:var(--red);stroke-dasharray:8 5}
+.facts{position:absolute;right:12px;bottom:12px;max-width:340px;pointer-events:none;background:var(--bg);border:1.5px solid var(--ink);padding:8px 12px;font-size:13px;line-height:1.6}
+#checks{padding:18px max(2vw,14px);overflow:auto;position:absolute;inset:0}
+.chk{display:grid;grid-template-columns:86px 1fr;gap:4px 14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.chk .t{font-weight:600}.chk p{margin:2px 0 0;color:var(--mute);font-size:14px;grid-column:2;max-width:70ch}
+.tag{font-size:12px;font-weight:600;border:1.5px solid currentColor;padding:2px 6px;align-self:start;text-align:center}
+.tag.issue{color:var(--red)}.tag.ok{color:var(--mute)}
+.review{border-left:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px}
+.files{font-size:13px;border:1px solid var(--line)}.files div{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}.files div:last-child{border:0}
+.state{font-weight:600}.state.rejected,.state.stale{color:var(--red)}
+textarea,input[type=text],input[type=email],input[type=password]{width:100%;border:1.5px solid var(--ink);padding:8px;font-size:16px;background:var(--bg)}
+textarea{min-height:84px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btnl{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border:1.5px solid var(--ink);text-decoration:none;font-weight:600}.btnl.on{background:var(--ink);color:var(--bg)}
+.acts .ap{background:var(--ink);color:var(--bg)}.acts .rj{border-color:var(--red);color:var(--red)}
+.voice{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.voice label.file{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border:1.5px dashed var(--ink);cursor:pointer;font-size:14px}
+.voice input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+.voice audio{width:100%;height:36px}
+.rec{color:var(--red);font-weight:600}
+.msg{font-size:13px;color:var(--mute);min-height:1em}.msg.err{color:var(--red)}
+.ev{padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.ev .d{font-weight:600}.ev .d.reject{color:var(--red)}.ev .when{color:var(--mute);font-size:12px}.ev .old{font-size:12px;color:var(--red)}
+.ev p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{color:var(--mute);font-size:14px}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;background:var(--bg);z-index:5;padding:20px;text-align:center}
+.loading.hide{display:none}
+.bar{width:220px;height:4px;background:var(--line);position:relative;overflow:hidden}.bar i{position:absolute;inset:0 auto 0 0;width:30%;background:var(--ink);animation:mv 1.1s infinite linear}
+@keyframes mv{from{left:-30%}to{left:100%}}
+.drop{border:2px dashed var(--ink);padding:22px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;background:var(--soft)}
+.drop.over{border-color:var(--red);background:var(--bg)}
+.drop input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+.drop .pick{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1.5px solid var(--ink);cursor:pointer;background:var(--bg)}
+.upl{max-width:760px;padding:0 max(3vw,14px) 24px;display:flex;flex-direction:column;gap:10px}
+.upl.panel{padding:16px max(3vw,14px);border-top:1.5px solid var(--ink);max-width:none}
+.upl[hidden],#upMore[hidden]{display:none!important}
+.lkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px}.or::before,.or::after{content:'';flex:1;border-top:1px solid var(--line)}
+.drop .pick.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.upl ul{margin:0;padding-left:18px;font-size:14px}
+.plist{max-width:760px;padding:10px max(3vw,14px) 40px}
+.plist a{display:flex;justify-content:space-between;gap:12px;padding:16px 0;border-bottom:1px solid var(--line);text-decoration:none;font-weight:600;font-size:17px}
+.plist a span{color:var(--mute);font-weight:400;font-size:14px;white-space:nowrap}
+@media(max-width:1100px){main{grid-template-columns:200px minmax(0,1fr)}.review{grid-column:1/-1;border-left:0;border-top:1.5px solid var(--ink)}}
+@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}aside{border-right:0}#rail{display:flex;overflow-x:auto}.part{min-width:190px;border-right:1px solid var(--line)}.rail-h{display:none}.pane{min-height:430px}.tool button{padding:0 10px}.tool label{padding:0 8px}.hint{display:none}.mout{bottom:8px}.facts{left:12px;right:12px;max-width:none}}
+@media(prefers-reduced-motion:reduce){.bar i{animation:none;width:100%}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/occt-import-js.js"></script>
+<script>
+{
+/* ===== settings ===== */
+const API_KEY='PASTE_GOOGLE_API_KEY_HERE';   // Google Drive API key (reads public folders only)
+/* ===================== */
+const Q=new URLSearchParams(location.search);
+const PROJECT_ID=(Q.get('f')||'').replace(/[^\w-]/g,''),RKEY=(Q.get('rk')||'').replace(/[^\w-]/g,''),WA=(Q.get('wa')||'').replace(/\D/g,''),TO=(Q.get('to')||'').trim();
+const APP_URL=location.origin+location.pathname;
+const OCCT_BASE='https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f2=v=>(+(+v).toFixed(2)).toString();
+const G='https://www.googleapis.com/drive/v3/files';
+async function gfetch(url,kind){
+  const h={};if(RKEY&&PROJECT_ID)h['X-Goog-Drive-Resource-Keys']=PROJECT_ID+'/'+RKEY;
+  let r;try{r=await fetch(url+(url.includes('?')?'&':'?')+'supportsAllDrives=true&key='+encodeURIComponent(API_KEY),{headers:h})}catch(e){throw new Error('Could not reach Google Drive. Check the internet connection.')}
+  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}
+    if(r.status===404||r.status===403&&!/key/i.test(m))throw new Error('Google Drive won\'t open this. The folder must be shared as "Anyone with the link".');
+    throw new Error('Google Drive error '+r.status+(m?': '+m:''))}
+  return kind==='json'?r.json():kind==='text'?r.text():new Uint8Array(await r.arrayBuffer())}
+async function driveList(id){let out=[],pt='';do{const j=await gfetch(G+'?q='+encodeURIComponent(`'${id}' in parents and trashed=false`)+'&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime)&pageSize=1000&includeItemsFromAllDrives=true'+(pt?'&pageToken='+pt:''),'json');out=out.concat(j.files||[]);pt=j.nextPageToken}while(pt);return out}
+async function folderMeta(id){const m=await gfetch(G+'/'+id+'?fields=id,name,mimeType','json');if(m.mimeType!=='application/vnd.google-apps.folder')throw new Error('This link is a single file. Use the link of the FOLDER that holds the STEP, DXF and PDF files.');return m}
+async function scanProject(id){const meta=await folderMeta(id);
+  const out={id,name:meta.name,steps:[],dxf:[],pdf:[],otherPdf:[],cad:[]},loose=[];let hasDraw=false;
+  const M=f=>({id:f.id,name:f.name,size:+f.size||0,updated:Date.parse(f.modifiedTime)});
+  const walk=async(fid,path,depth)=>{const items=await driveList(fid),subs=[];
+    for(const x of items){const n=x.name.toLowerCase();
+      if(x.mimeType==='application/vnd.google-apps.folder'){if(x.name[0]==='_'||/superseded|old|archive/i.test(x.name))continue;if(/draw|pdf/i.test(x.name))hasDraw=true;if(depth<3)subs.push(x)}
+      else if(/\.(step|stp)$/.test(n))out.steps.push(M(x));else if(/\.dxf$/.test(n))out.dxf.push(M(x));
+      else if(/\.pdf$/.test(n))(/draw|pdf/.test(path)?out.pdf:loose).push(M(x));else if(/\.(sldprt|sldasm|slddrw)$/.test(n))out.cad.push(x.name)}
+    await Promise.all(subs.map(x=>walk(x.id,path+'/'+x.name.toLowerCase(),depth+1)))};
+  await walk(id,'',0);if(hasDraw)out.otherPdf=loose;else out.pdf=out.pdf.concat(loose);out.steps.sort((a,b)=>b.updated-a.updated);return out}
+const fileBytes=id=>gfetch(G+'/'+id+'?alt=media'),fileText=id=>gfetch(G+'/'+id+'?alt=media','text');
+function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
+  if(!m){if(/\/file\/d\//.test(s))throw new Error('That is a link to a single file. Paste the link of the FOLDER.');throw new Error('Paste the link of a Google Drive folder (it contains /folders/).')}
+  return {id:m[1],rk:(s.match(/resourcekey=([\w-]+)/)||[])[1]||''}}
+const ls={get:k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+const b64u8=b=>{const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
+
+/* ================= start page ================= */
+if(/PASTE_/.test(API_KEY)){
+  $('app').innerHTML='<header><div><h1>Drawing review</h1><div class="sub">Almost ready</div></div></header><div class="plist"><p>Put your Google Drive API key in index.html (the line <code>const API_KEY=</code>) and upload it again.</p></div>';
+} else if(!PROJECT_ID) landing(); else startProject();
+
+function landing(){
+  $('app').innerHTML=`<header><div><h1>Drawing review</h1><div class="sub">Paste a Google Drive folder link, then send the review link to the engineer</div></div></header>
+  <div class="upl panel">
+   <h2>Create a review link</h2>
+   <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders.</div>
+   <input type="text" id="lkUrl" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url">
+   <div class="sub" style="margin-top:6px">Where should the engineer's approvals and comments go?</div>
+   <div class="row2"><input type="tel" id="waNum" placeholder="Your WhatsApp, e.g. 201001234567" aria-label="Your WhatsApp number with country code" value="${esc(ls.get('rv_wa'))}"><input type="email" id="toMail" placeholder="Your email (optional)" aria-label="Your email" value="${esc(ls.get('rv_to'))}"></div>
+   <button id="lkGo" class="on" style="align-self:start">Create review link</button>
+   <div class="msg" id="lkMsg"></div>
+   <div id="lkOut"></div>
+  </div>
+  <div class="plist"><h2 style="margin:8px 0 4px">Recent projects</h2><div id="pl"></div></div>`;
+  let rc=[];try{rc=JSON.parse(ls.get('rv_recent')||'[]')}catch(e){}
+  $('pl').innerHTML=rc.length?rc.map(p=>`<a href="${esc(p.url)}">${esc(p.name)}<span>${new Date(p.at).toLocaleDateString()}</span></a>`).join(''):'<p class="empty">Projects opened on this device show up here.</p>';
+  const go=async()=>{const M=$('lkMsg');M.className='msg';$('lkOut').innerHTML='';
+    let L;try{L=parseLink($('lkUrl').value)}catch(e){M.textContent=e.message;M.className='msg err';$('lkUrl').focus();return}
+    const wa=$('waNum').value.replace(/\D/g,''),to=$('toMail').value.trim();
+    if(wa&&wa.length<10){M.textContent='Write the WhatsApp number with the country code, e.g. 201001234567.';M.className='msg err';return}
+    if(to&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){M.textContent='That email doesn\'t look right.';M.className='msg err';return}
+    ls.set('rv_wa',wa);ls.set('rv_to',to);M.textContent='Checking the folder…';
+    try{const h={};if(L.rk)h['X-Goog-Drive-Resource-Keys']=L.id+'/'+L.rk;
+      const r=await fetch(G+'/'+L.id+'?fields=name,mimeType&supportsAllDrives=true&key='+encodeURIComponent(API_KEY),{headers:h});
+      if(!r.ok)throw new Error('Google Drive won\'t open this folder. Set its sharing to "Anyone with the link" and try again.');
+      const m=await r.json();if(m.mimeType!=='application/vnd.google-apps.folder')throw new Error('This link is a single file. Use the link of the FOLDER.');
+      const u=APP_URL+'?f='+L.id+(L.rk?'&rk='+L.rk:'')+(wa?'&wa='+wa:'')+(to?'&to='+encodeURIComponent(to):'');
+      M.textContent=`"${m.name}" is ready.`+(wa||to?'':' No WhatsApp or email given, so the engineer will copy his decision and send it himself.');
+      $('lkOut').innerHTML=`<div class="lkrow"><input type="text" id="outUrl" readonly value="${esc(u)}" aria-label="Review link"><button id="cp">Copy</button></div><p><a href="${esc(u)}">Open the review page</a></p>`;
+      $('cp').onclick=async()=>{try{await navigator.clipboard.writeText(u);$('cp').textContent='Copied'}catch(e){$('outUrl').select()}};
+    }catch(e){M.textContent=e.message;M.className='msg err'}};
+  $('lkGo').onclick=go;$('lkUrl').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+}
+
+/* ================= project page ================= */
+function startProject(){
+$('app').innerHTML=`
+<header>
+  <div><div class="sub"><a href="${esc(APP_URL)}">Open another folder</a></div><h1 id="pName">Loading…</h1><div class="sub" id="pSub"></div></div>
+  <div class="release"><div><div class="big" id="cntBig">–</div><div class="sub">parts approved on the current files</div></div><div class="stamp no" id="stamp">Not released for fabrication</div></div>
+</header>
+<main>
+  <aside><div class="rail-h">Parts — click to review</div><div id="rail"></div></aside>
+  <section class="center">
+    <div class="tabs" id="tabs">
+      <button data-t="3d" class="on">3D model</button><button data-t="pdf">Drawing (PDF)</button><button data-t="dxf">Flat pattern (DXF)</button><button data-t="chk">Pre-checks<span class="cnt" id="issueCnt"></span></button>
+    </div>
+    <div class="pane show" id="p-3d">
+      <div id="three"></div>
+      <div class="tool">
+        <label>Explode <input type="range" id="explode" min="0" max="100" value="0" aria-label="Explode distance"></label>
+        <label><input type="checkbox" id="isolate"> Selected only</label>
+        <label><input type="checkbox" id="single"> One piece</label>
+        <button id="mBtn" aria-pressed="false">Measure</button><button id="fit">Fit</button><button id="vIso">Iso</button><button id="vTop">Top</button><button id="vFront">Front</button>
+      </div>
+      <div class="mlabel" id="mLabel"></div>
+      <div class="mout"><span id="pieceNote"></span> <span id="mOut"></span></div>
+      <div class="hint">Drag to rotate · right-drag or two fingers to pan · scroll or pinch to zoom · tap a piece to select it</div>
+      <div class="loading" id="load3d"><div id="loadMsg">Loading files from Drive…</div><div class="bar"><i></i></div></div>
+    </div>
+    <div class="pane" id="p-pdf">
+      <div class="tool"><button id="pdfMain">Main views</button><button id="pdfPart">Part sheet</button><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button><button id="zFit">Fit width</button><label id="pgL" style="display:none"></label></div>
+      <div id="pdfBox"></div>
+    </div>
+    <div class="pane" id="p-dxf">
+      <div class="tool"><button id="dxfFit">Fit</button><button id="dxfM" aria-pressed="false">Measure</button><button id="dIn" aria-label="Zoom in">+</button><button id="dOut2" aria-label="Zoom out">−</button></div>
+      <div id="dxfBox"></div><div class="facts" id="dxfFacts"></div>
+    </div>
+    <div class="pane" id="p-chk"><div id="checks"></div></div>
+  </section>
+  <section class="review" id="review"></section>
+</main>`;
+init();
+}
+
+function init(){
+let P=null, PARTS=[], sel=null, tab='3d', reviews=[], stepMeta=null, MAIN_PDF=null, CHECKS=[];
+const pdfDocs={};
+
+/* ---------- DXF parsing ---------- */
+function parseDxf(text){
+  const L=text.split(/\r?\n/),ents=[],unsupported={};
+  let i=0;while(i<L.length-1&&!(L[i].trim()==='2'&&L[i+1].trim()==='ENTITIES'))i++;
+  i+=2;let cur=null;
+  const push=()=>{if(cur)ents.push(cur);cur=null};
+  for(;i<L.length-1;i+=2){const c=+L[i].trim(),v=L[i+1].trim();
+    if(c===0){push();if(v==='ENDSEC')break;
+      if(['LINE','CIRCLE','ARC','LWPOLYLINE'].includes(v))cur={t:v,layer:'0',pts:[],b:[]};else{unsupported[v]=(unsupported[v]||0)+1}continue}
+    if(!cur)continue;
+    if(c===8)cur.layer=v;
+    else if(cur.t==='LWPOLYLINE'){if(c===10)cur.pts.push([+v,0]),cur.b.push(0);else if(c===20)cur.pts[cur.pts.length-1][1]=+v;else if(c===42)cur.b[cur.b.length-1]=+v;else if(c===70)cur.closed=(+v&1)===1}
+    else{if(c===10)cur.x=+v;else if(c===20)cur.y=+v;else if(c===11)cur.x2=+v;else if(c===21)cur.y2=+v;else if(c===40)cur.r=+v;else if(c===50)cur.a1=+v;else if(c===51)cur.a2=+v}}
+  delete unsupported.SEQEND;delete unsupported.VERTEX;
+  return {ents,unsupported};
+}
+const isBend=l=>/bend/i.test(l);
+function arcPts(cx,cy,r,a1,a2){let s=a1*Math.PI/180,e=a2*Math.PI/180;if(e<=s)e+=2*Math.PI;const n=Math.max(4,Math.ceil((e-s)/(Math.PI/24))),o=[];for(let k=0;k<=n;k++){const a=s+(e-s)*k/n;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o}
+function bulgePts(p,q,b){if(!b)return [p,q];const th=4*Math.atan(b),d=Math.hypot(q[0]-p[0],q[1]-p[1]),r=d/(2*Math.sin(th/2)),mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,h=r*Math.cos(th/2),nx=-(q[1]-p[1])/d,ny=(q[0]-p[0])/d;
+  const cx=mx+nx*h,cy=my+ny*h,a1=Math.atan2(p[1]-cy,p[0]-cx);const n=12,o=[];for(let k=0;k<=n;k++){const a=a1+th*k/n;o.push([cx+Math.abs(r)*Math.cos(a)*Math.sign(r)*Math.sign(r),cy+Math.abs(r)*Math.sin(a)])}o[0]=p;o[n]=q;return o}
+/* segments (non-bend), circles, polylines for drawing */
+function geom(d){const segs=[],polys=[],circles=[];
+  for(const e of d.ents){const b=isBend(e.layer);
+    if(e.t==='LINE'){polys.push({p:[[e.x,e.y],[e.x2,e.y2]],b});if(!b)segs.push([[e.x,e.y],[e.x2,e.y2]])}
+    else if(e.t==='CIRCLE'){circles.push({x:e.x,y:e.y,r:e.r,b})}
+    else if(e.t==='ARC'){const p=arcPts(e.x,e.y,e.r,e.a1,e.a2);polys.push({p,b});if(!b)for(let k=0;k<p.length-1;k++)segs.push([p[k],p[k+1]])}
+    else if(e.t==='LWPOLYLINE'){const n=e.pts.length,all=[];for(let k=0;k<(e.closed?n:n-1);k++){const s=bulgePts(e.pts[k],e.pts[(k+1)%n],e.b[k]);if(k)s.shift();all.push(...s)}polys.push({p:all,b});if(!b)for(let k=0;k<all.length-1;k++)segs.push([all[k],all[k+1]])}}
+  return {segs,polys,circles}}
+function flatArea(g){const key=p=>Math.round(p[0]*50)+','+Math.round(p[1]*50),adj=new Map(),used=new Set();
+  g.segs.forEach((s,i)=>{for(const p of s){const k=key(p);if(!adj.has(k))adj.set(k,[]);adj.get(k).push(i)}});
+  const loops=[];let open=0;
+  for(let i=0;i<g.segs.length;i++){if(used.has(i))continue;used.add(i);const pts=[g.segs[i][0],g.segs[i][1]];let ok=false;
+    for(let guard=0;guard<100000;guard++){const end=pts[pts.length-1];if(key(end)===key(pts[0])&&pts.length>2){ok=true;break}
+      const nx=(adj.get(key(end))||[]).find(j=>!used.has(j));if(nx===undefined)break;used.add(nx);const s=g.segs[nx];pts.push(key(s[0])===key(end)?s[1]:s[0])}
+    if(ok){let a=0;for(let k=0;k<pts.length-1;k++)a+=pts[k][0]*pts[k+1][1]-pts[k+1][0]*pts[k][1];loops.push(Math.abs(a)/2)}else open++}
+  const holes=g.circles.filter(c=>!c.b).reduce((s,c)=>s+Math.PI*c.r*c.r,0);
+  if(!loops.length)return {area:null,open};
+  loops.sort((a,b)=>b-a);return {area:loops[0]-loops.slice(1).reduce((s,x)=>s+x,0)-holes,open}}
+function extents(g){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const up=(x,y)=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)};
+  for(const p of g.polys)for(const q of p.p)up(q[0],q[1]);for(const c of g.circles){up(c.x-c.r,c.y-c.r);up(c.x+c.r,c.y+c.r)}return [x0,y0,x1,y1]}
+
+/* ---------- names ---------- */
+function partFromDxf(m){const base=m.name.replace(/\.dxf$/i,'');const k=(base.match(/^\s*([A-Za-z0-9]+)/)||[])[1]||base;
+  const q=base.match(/qty\s*[:=]?\s*(\d+)/i),t=base.match(/(\d+(?:\.\d+)?)\s*mm/i);
+  return {k,qty:q?+q[1]:null,t:t?+t[1]:null,rl:/R\s*&\s*L/i.test(base),dxfMeta:m}}
+const tokens=n=>n.replace(/\.[^.]+$/,'').split(/[\s_.\-()]+/).filter(Boolean);
+const isMain=n=>/main|assembly|assy|general/i.test(n);
+
+/* ---------- load ---------- */
+const loadMsg=t=>{$('loadMsg').textContent=t};
+(async()=>{
+  try{
+    P=await scanProject(PROJECT_ID);
+  }catch(e){$('pName').textContent='Project not available';loadMsg(e.message);return}
+  $('pName').textContent=P.name;
+  try{let rc=JSON.parse(ls.get('rv_recent')||'[]').filter(x=>x.id!==P.id);rc.unshift({id:P.id,name:P.name,at:Date.now(),url:location.href});ls.set('rv_recent',JSON.stringify(rc.slice(0,12)))}catch(e){}try{reviews=JSON.parse(ls.get('rv_dec_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
+  PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
+  const keys=new Set(PARTS.map(p=>p.k));
+  for(const f of P.pdf){if(isMain(f.name)){MAIN_PDF=MAIN_PDF||f;continue}
+    const tk=tokens(f.name);const hit=PARTS.find(p=>tk[tk.length-1]===p.k||tk[0]===p.k);if(hit&&!hit.pdfMeta)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}
+  stepMeta=P.steps[0]||null;
+  $('pSub').textContent=`${PARTS.length} parts · ${PARTS.reduce((s,p)=>s+(p.qty||0),0)} pieces · model ${stepMeta?stepMeta.name:'missing'}`;
+  sel=PARTS[0]?.k||null;renderRail();renderReview();
+  loadMsg(`Loading ${PARTS.length} flat patterns…`);
+  await Promise.all(PARTS.map(async p=>{try{p.dxf=parseDxf(await fileText(p.dxfMeta.id));p.g=geom(p.dxf);p.fa=flatArea(p.g);p.ext=extents(p.g)}catch(e){p.dxfErr=e.message}}));
+  renderRail();if(tab==='dxf')drawDxf();
+  loadMsg('Loading drawings…');
+  await initPdf();
+  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[])].map(async m=>{try{const doc=await pdfjsLib.getDocument({data:await fileBytes(m.id)}).promise;pdfDocs[m.id]=doc;
+    let txt='';for(let n=1;n<=Math.min(doc.numPages,3);n++){const c=await (await doc.getPage(n)).getTextContent();txt+=' '+c.items.map(i=>i.str).join(' ')}m.text=txt}catch(e){m.err=e.message}}));
+  if(tab==='pdf')loadPdf();
+  if(stepMeta){loadMsg('Loading 3D model ('+(stepMeta.size/1048576).toFixed(1)+' MB)…');
+    try{const stepBytes=await fileBytes(stepMeta.id);loadMsg('Reading 3D model — first time can take ~10 s…');
+      const occt=await occtimportjs({locateFile:f=>OCCT_BASE+f});
+      const res=occt.ReadStepFile(stepBytes,{linearUnit:'millimeter',linearDeflectionType:'absolute_value',linearDeflection:0.3,angularDeflection:0.3});
+      if(!res.success)throw new Error('The STEP file could not be read.');
+      build3d(res.meshes);
+    }catch(e){loadMsg('3D model: '+e.message);P.stepErr=e.message}}
+  else loadMsg((P.cad&&P.cad.length?'Only SolidWorks files found. ':'')+'Add a STEP export of the model to the project folder to see it in 3D.');
+  mapBodies();runChecks();renderRail();renderReview();paint3d();
+  if(meshes.length){$('load3d').classList.add('hide');view('iso')}
+})();
+
+/* ---------- body → part mapping ---------- */
+let groups=[];
+function mapBodies(){if(!meshes.length)return;
+  for(const m of meshes)m.userData.part=null;
+  // 1) by body name
+  for(const m of meshes){const n=(m.userData.name||'').trim();if(!n)continue;const tk=tokens(n);const p=PARTS.find(p=>tk[0]===p.k||tk[tk.length-1]===p.k);if(p)m.userData.part=p.k}
+  // 2) by geometry: group identical bodies, match volume ≈ flat area × thickness and count = qty
+  const free=meshes.filter(m=>!m.userData.part);groups=[];
+  for(const m of free){const u=m.userData;const g=groups.find(g=>Math.abs(g.vol-u.vol)/u.vol<0.004&&g.dims.every((d,i)=>Math.abs(d-u.dims[i])<0.8));if(g)g.ms.push(m);else groups.push({vol:u.vol,dims:u.dims,ms:[m]})}
+  const todo=PARTS.filter(p=>!meshes.some(m=>m.userData.part===p.k)).sort((a,b)=>(b.qty||0)-(a.qty||0));
+  for(const p of todo){if(!p.fa||!p.fa.area||!p.t)continue;const target=p.fa.area*p.t;
+    const cand=groups.filter(g=>!g.part).map(g=>({g,err:Math.abs(g.vol-target)/target}));
+    const same=cand.filter(c=>c.g.ms.length===p.qty&&c.err<0.08).sort((a,b)=>a.err-b.err);
+    const pick=same[0]||cand.filter(c=>c.err<0.08).sort((a,b)=>a.err-b.err)[0];
+    if(pick){pick.g.part=p.k;p.matchErr=pick.err;for(const m of pick.g.ms)m.userData.part=p.k}}
+  for(const p of PARTS)p.bodies=meshes.filter(m=>m.userData.part===p.k).length;
+}
+
+/* ---------- pre-checks ---------- */
+function runChecks(){const C=[];const add=(s,t,p,k)=>C.push({s,t,p,k});
+  if(!stepMeta)add('issue','No 3D model (STEP) in the project folder',(P.cad&&P.cad.length?'Found SolidWorks files ('+P.cad.slice(0,3).join(', ')+') — a browser can\'t open those. ':'')+'In SolidWorks: File ▸ Save As ▸ STEP AP214, and put the .step file in the project folder or any sub-folder.');
+  if(P.steps.length>1)add('issue','More than one STEP file',`Using the newest: ${stepMeta.name}. Other: ${P.steps.slice(1).map(s=>s.name).join(', ')}. Remove old ones so nobody reviews the wrong model.`);
+  if(!PARTS.length)add('issue','No DXF files found','Put the .dxf flats anywhere in the project folder (e.g. a "DXF" sub-folder).');
+  let qtyOk=true,flatOk=true;
+  for(const p of PARTS){
+    if(p.dxfErr){add('issue',`Part ${p.k}: DXF could not be read`,p.dxfErr,p.k);continue}
+    const uns=Object.keys(p.dxf.unsupported||{});if(uns.length)add('verify',`Part ${p.k}: DXF has entities this viewer doesn't draw`,uns.join(', ')+' — check the flat in your CAD viewer.',p.k);
+    if(p.qty==null)add('issue',`Part ${p.k}: no quantity in the DXF name`,`"${p.dxfMeta.name}" — expected "… _Qty n".`,p.k);
+    if(!p.pdfMeta)add('issue',`Part ${p.k}: no drawing PDF`,'No PDF in the Drawings folder is named for this part (e.g. ST_'+p.k+'.pdf).',p.k);
+    else if(p.pdfMeta.text){const q=p.pdfMeta.text.match(/QTY\s*:?\s*(\d+)\s*(\(\s*\d*\s*R\s*&\s*\d*\s*L\s*\))?/i),th=p.pdfMeta.text.match(/Thickness\s*:?\s*([\d.]+)\s*mm/i);
+      if(q&&p.qty!=null&&+q[1]!==p.qty){qtyOk=false;add('issue',`Part ${p.k}: quantity differs`,`Drawing says QTY ${q[1]}, DXF name says Qty ${p.qty}.`,p.k)}
+      if(q&&!!q[2]!==p.rl)add('issue',`Part ${p.k}: R&L marking differs`,`Drawing says "${q[0].trim()}", DXF name is "${p.dxfMeta.name}". Decide if they are true left/right parts and make both match.`,p.k);
+      if(th&&p.t!=null&&+th[1]!==p.t)add('issue',`Part ${p.k}: thickness differs`,`Drawing says ${th[1]} mm, DXF name says ${p.t} mm.`,p.k)}
+    if(meshes.length){if(!p.bodies){flatOk=false;add('issue',`Part ${p.k}: not found in the 3D model`,'No body in the STEP matches this flat (volume ≠ flat area × thickness). The flat or the model may be out of date.',p.k)}
+      else{if(p.qty!=null&&p.bodies!==p.qty){qtyOk=false;add('issue',`Part ${p.k}: model has ${p.bodies} piece(s), DXF says ${p.qty}`,'Quantity in the model and the DXF name disagree.',p.k)}
+        if(p.matchErr>0.02){flatOk=false;add('verify',`Part ${p.k}: flat and model differ by ${(p.matchErr*100).toFixed(1)}%`,'Flat area × thickness should equal the body volume. Check bend allowance / K-factor or whether the flat is up to date.',p.k)}}}
+  }
+  if(meshes.length){const un=meshes.filter(m=>!m.userData.part).length;if(un)add('issue',`${un} piece(s) in the 3D model have no DXF`,'Every body should have a flat. They are shown in grey in the 3D view.');
+    if(qtyOk&&PARTS.length&&!C.some(c=>/quantity|pieces/.test(c.t)))add('ok','Quantities agree across model, DXF and drawings',PARTS.map(p=>p.k+' '+p.qty).join(' · ')+` (${meshes.length} pieces in the model).`);
+    if(flatOk&&PARTS.length)add('ok','Every flat matches its 3D body','Flat area × thickness equals the body volume within 2% for all parts.')}
+  if(P.extraPdf&&P.extraPdf.length)add('verify','Drawings that are not linked to a part',P.extraPdf.map(f=>`${f.name} (${new Date(f.updated).toLocaleDateString()})`).join(', ')+' — make sure they are current, or move them out.');
+  if(P.otherPdf&&P.otherPdf.length){const old=P.otherPdf.map(f=>f.updated).sort()[0];add('issue',`${P.otherPdf.length} PDF(s) outside the Drawings folder`,P.otherPdf.map(f=>f.name).join(', ')+` — oldest from ${new Date(old).toLocaleDateString()}. If this is an old set, move it to a "_Superseded" folder so it can't be sent by mistake.`)}
+  CHECKS=C.sort((a,b)=>({issue:0,verify:1,ok:2}[a.s]-{issue:0,verify:1,ok:2}[b.s]));
+  $('issueCnt').textContent=C.filter(c=>c.s==='issue').length||'';
+  $('checks').innerHTML='<h2 style="margin-bottom:6px">Automatic checks on this file set</h2><div class="sub">Run on the STEP model, the DXF flats and the drawing PDFs each time the page opens.</div>'+
+    CHECKS.map(c=>`<div class="chk"><span class="tag ${c.s}">${c.s==='issue'?'Issue':c.s==='verify'?'Verify':'Passed'}</span><div class="t">${esc(c.t)}</div><p>${esc(c.p)}</p></div>`).join('');
+}
+
+/* ---------- status ---------- */
+const bundle=p=>[p.pdfMeta?p.pdfMeta.id+'@'+p.pdfMeta.updated:'-',p.dxfMeta.id+'@'+p.dxfMeta.updated,stepMeta?stepMeta.id+'@'+stepMeta.updated:'-'].join('|');
+function statusOf(p){const ev=reviews.filter(e=>e.part===p.k&&e.decision!=='comment').sort((a,b)=>a.at<b.at?1:-1);
+  if(!ev.length)return {s:'pending',label:'Pending review'};const l=ev[0];
+  if(l.bundle!==bundle(p))return {s:'stale',label:'Files changed since last review — re-review needed'};
+  return l.decision==='approve'?{s:'approved',label:'Approved'}:{s:'rejected',label:'Changes requested'}}
+function renderRail(){
+  $('rail').innerHTML=PARTS.map(p=>{const st=statusOf(p),sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
+    return `<button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}, ${esc(st.label)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span class="dot ${st.s}" title="${esc(st.label)}"></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm</span></button>`}).join('');
+  const n=PARTS.filter(p=>statusOf(p).s==='approved').length;$('cntBig').textContent=n+' / '+PARTS.length;
+  const st=$('stamp');if(PARTS.length&&n===PARTS.length){st.textContent='Released for fabrication';st.className='stamp'}
+  else{const r=PARTS.filter(p=>['rejected','stale'].includes(statusOf(p).s)).length;st.textContent=r?`Not released · ${r} part${r>1?'s':''} need changes`:'Not released for fabrication';st.className='stamp no'}}
+$('rail').addEventListener('click',e=>{const b=e.target.closest('.part');if(b)select(b.dataset.k)});
+
+/* ---------- review panel (decision is sent by WhatsApp / email) ---------- */
+const fmtT=t=>new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+function msg(t,err){const m=$('msg');if(m){m.textContent=t;m.className='msg'+(err?' err':'')}}
+function renderReview(){const p=PARTS.find(x=>x.k===sel);const R=$('review');
+  if(!p){R.innerHTML='<p class="empty">No parts to review.</p>';return}
+  const st=statusOf(p),ev=reviews.filter(e=>e.part===p.k).sort((a,b)=>a.at<b.at?1:-1);
+  const dest=[WA?'WhatsApp':'',TO?'email':''].filter(Boolean).join(' or ');
+  R.innerHTML=`<div><h2>Part ${esc(p.k)}</h2><div class="sub">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · thickness ${p.t??'?'} mm${p.bodies!=null&&meshes.length?' · '+p.bodies+' in model':''}</div></div>
+   <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
+   <div class="files"><div><span>${esc(p.pdfMeta?p.pdfMeta.name:'No drawing PDF')}</span></div><div><span>${esc(p.dxfMeta.name)}</span></div><div><span>${esc(stepMeta?stepMeta.name:'No STEP')}</span></div></div>
+   <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
+   <textarea id="note" placeholder="Comment — what needs to change?${WA?' (or send a voice note in WhatsApp)':''}"></textarea>
+   <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
+   <div class="sub">${dest?`Your decision opens in ${dest} as a ready message with the exact file versions — just press Send.${WA?' For a voice note, record it in that WhatsApp chat.':''}`:'Your decision is prepared as a message — copy it and send it to the designer.'}</div>
+   <div id="sendBox"></div>
+   <div class="msg" id="msg"></div>
+   <h2>Your decisions on this device</h2>
+   <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Approved':'Changes requested'}</span> · <b>${esc(e.name)}</b><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle(p)?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
+  $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');
+}
+function fileLine(m){return m?`${m.name} (${fmtT(m.updated)})`:'—'}
+function decide(decision){const p=PARTS.find(x=>x.k===sel);
+  const name=$('rvName').value.trim(),note=$('note').value.trim();
+  if(!name){msg('Write your name first.',1);$('rvName').focus();return}
+  if(decision==='reject'&&!note&&!WA){msg('Write what needs to change.',1);$('note').focus();return}
+  ls.set('rv_name',name);
+  const was=statusOf(p).s;reviews.push({part:p.k,decision,name,note,bundle:bundle(p),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
+  const all=PARTS.every(x=>statusOf(x).s==='approved');
+  const text=[(decision==='approve'?'✅ APPROVED':'❌ CHANGES REQUESTED')+` — ${P.name} — Part ${p.k}`,
+    `By: ${name}`,`Time: ${fmtT(Date.now())}`,
+    note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
+    `Files reviewed:`,`• Drawing: ${fileLine(p.pdfMeta)}`,`• Flat: ${fileLine(p.dxfMeta)}`,`• Model: ${fileLine(stepMeta)}`,
+    all&&decision==='approve'&&was!=='approved'?`\nAll ${PARTS.length} parts are now approved — released for fabrication.`:'',
+    `Review page: ${location.href}`].filter(Boolean).join('\n');
+  const subj=(decision==='approve'?'[APPROVED] ':'[CHANGES REQUESTED] ')+P.name+' — Part '+p.k;
+  renderRail();renderReview();
+  $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2">${WA?`<a class="btnl on" href="https://wa.me/${WA}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>`:''}${TO?`<a class="btnl" href="mailto:${encodeURIComponent(TO)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}">Email</a>`:''}<button id="cpMsg">Copy message</button></div>`;
+  $('cpMsg').onclick=async()=>{try{await navigator.clipboard.writeText(text);$('cpMsg').textContent='Copied'}catch(e){msg('Copy failed — select the text manually.',1)}};
+  if(WA&&!TO)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
+  else if(TO&&!WA)setTimeout(()=>{const a=$('sendBox').querySelector('a');a&&a.click()},150);
+  msg(decision==='approve'?'Approved — now press Send in the message.':'Saved — now press Send in the message.');
+}
+
+/* ---------- tabs ---------- */
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;tab=b.dataset.t;
+  for(const x of $('tabs').children)x.classList.toggle('on',x===b);
+  for(const id of ['3d','pdf','dxf','chk'])$('p-'+id).classList.toggle('show',id===tab);
+  if(tab==='3d')resize3d();if(tab==='pdf')loadPdf();if(tab==='dxf')drawDxf()});
+function select(k,keep){sel=k;if(!keep)one=meshes.find(m=>m.userData.part===k)||null;renderRail();renderReview();clearMeas();paint3d();if(single())view(curView);if(tab==='pdf'){pdfMode='part';loadPdf()}if(tab==='dxf')drawDxf()}
+
+/* ---------- 3D ---------- */
+const host=$('three');
+const R=new THREE.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,2));host.appendChild(R.domElement);
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,1,50000);cam.up.set(0,0,1);
+scene.add(new THREE.HemisphereLight(0xffffff,0x888888,0.85));const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(1,-2,3);scene.add(dl);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;
+const meshes=[];let center=new THREE.Vector3(),radius=1000,one=null,curView='iso',measOn=false,mPts=[];
+const mGroup=new THREE.Group();scene.add(mGroup);
+function build3d(list){const box=new THREE.Box3();
+  for(const b of list){const pos=b.attributes.position.array,idx=b.index.array;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(Array.from(idx));g.computeVertexNormals();g.computeBoundingBox();
+    let v=0;for(let k=0;k<idx.length;k+=3){const A=idx[k]*3,B=idx[k+1]*3,C=idx[k+2]*3;v+=(pos[A]*(pos[B+1]*pos[C+2]-pos[B+2]*pos[C+1])-pos[A+1]*(pos[B]*pos[C+2]-pos[B+2]*pos[C])+pos[A+2]*(pos[B]*pos[C+1]-pos[B+1]*pos[C]))/6}
+    const sz=g.boundingBox.getSize(new THREE.Vector3());
+    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xb9bec4,metalness:.35,roughness:.55,side:THREE.DoubleSide,transparent:true}));
+    m.userData={name:b.name||'',vol:Math.abs(v),dims:[sz.x,sz.y,sz.z].sort((a,b)=>a-b),c:g.boundingBox.getCenter(new THREE.Vector3())};
+    m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,30),new THREE.LineBasicMaterial({color:0x222222,transparent:true,opacity:.35})));
+    scene.add(m);meshes.push(m);box.union(g.boundingBox)}
+  box.getCenter(center);radius=box.getSize(new THREE.Vector3()).length()/2;resize3d()}
+const single=()=>$('single').checked;
+const shown=()=>single()?(one?[one]:[]):meshes;
+function paint3d(){const iso=$('isolate').checked,sg=single();
+  for(const m of meshes){const on=m.userData.part===sel,un=!m.userData.part;m.visible=!sg||m===one;
+    m.material.color.set(on?0xe4002b:un?0x8a6d3b:0xb9bec4);m.material.opacity=sg?1:(on?1:(iso?0.07:0.9));m.material.depthWrite=sg||on||!iso;m.children[0].material.opacity=on?.6:(iso&&!sg?.04:.35)}
+  const p=PARTS.find(x=>x.k===sel);$('pieceNote').textContent=sg&&p&&one?`Showing 1 of ${p.bodies||1} piece${(p.bodies||1)>1?'s':''} of part ${p.k}`:''}
+function explode(){const k=single()?0:$('explode').value/100*1.6;for(const m of meshes)m.position.copy(m.userData.c.clone().sub(center).multiplyScalar(k));clearMeas()}
+function view(v){const bx=new THREE.Box3();for(const m of shown())bx.expandByObject(m);if(bx.isEmpty())return;const c=bx.getCenter(new THREE.Vector3()),r=Math.max(bx.getSize(new THREE.Vector3()).length()*1.3/Math.min(1,cam.aspect||1),60);
+  const d=v==='top'?[0.001,-0.001,1]:v==='front'?[0,-1,0.001]:[0.9,-1.1,0.9],L=Math.hypot(...d);cam.position.set(c.x+d[0]/L*r,c.y+d[1]/L*r,c.z+d[2]/L*r);ctl.target.copy(c);ctl.update()}
+function resize3d(){const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;R.setSize(w,h,false);R.domElement.style.width='100%';R.domElement.style.height='100%';cam.aspect=w/h;cam.updateProjectionMatrix()}
+const ro3=new ResizeObserver(resize3d);ro3.observe(host);
+const lbl=$('mLabel');
+(function loop(){requestAnimationFrame(loop);if(tab!=='3d')return;ctl.update();R.render(scene,cam);
+  if(mPts.length===2){const a=mPts[0].w.clone().add(mPts[1].w).multiplyScalar(.5).project(cam);lbl.style.display='block';lbl.style.left=((a.x+1)/2*host.clientWidth)+'px';lbl.style.top=((1-a.y)/2*host.clientHeight)+'px'}else lbl.style.display='none'})();
+$('explode').oninput=explode;$('explode').onchange=()=>view(curView);$('isolate').onchange=paint3d;
+$('single').onchange=()=>{if(single()&&!one)one=meshes.find(m=>m.userData.part===sel)||null;$('explode').disabled=single();paint3d();explode();view(curView)};
+$('fit').onclick=()=>view(curView);$('vIso').onclick=()=>view(curView='iso');$('vTop').onclick=()=>view(curView='top');$('vFront').onclick=()=>view(curView='front');
+$('mBtn').onclick=()=>{measOn=!measOn;$('mBtn').classList.toggle('on',measOn);$('mBtn').setAttribute('aria-pressed',measOn);clearMeas();R.domElement.style.cursor=measOn?'crosshair':''};
+function clearMeas(){mPts=[];mGroup.clear();$('mOut').textContent=measOn?'Measure: tap the first point (snaps to corners and edges)':''}
+function addPt(hit,sx,sy){const m=hit.object,r=R.domElement.getBoundingClientRect(),pos=m.geometry.attributes.position,f=hit.face;
+  const vs=[f.a,f.b,f.c].map(i=>new THREE.Vector3().fromBufferAttribute(pos,i)),cands=[...vs];for(let i=0;i<3;i++)cands.push(vs[i].clone().add(vs[(i+1)%3]).multiplyScalar(.5));
+  let best=m.worldToLocal(hit.point.clone()),bd=16;
+  for(const c of cands){const w=m.localToWorld(c.clone()).project(cam),px=Math.hypot((w.x+1)/2*r.width-sx,(1-w.y)/2*r.height-sy);if(px<bd){bd=px;best=c.clone()}}
+  const w=m.localToWorld(best.clone());mPts.push({l:best,w});
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius*0.006,1.2),16,12),new THREE.MeshBasicMaterial({color:0xe4002b,depthTest:false}));dot.position.copy(w);dot.renderOrder=9;mGroup.add(dot);
+  if(mPts.length===1){$('mOut').textContent='Measure: tap the second point';return}
+  const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mPts[0].w,mPts[1].w]),new THREE.LineBasicMaterial({color:0xe4002b,depthTest:false}));ln.renderOrder=9;mGroup.add(ln);
+  const d=mPts[1].l.clone().sub(mPts[0].l);lbl.textContent=f2(d.length())+' mm';
+  $('mOut').innerHTML=`Distance <b>${f2(d.length())} mm</b> · ΔX ${f2(Math.abs(d.x))} · ΔY ${f2(Math.abs(d.y))} · ΔZ ${f2(Math.abs(d.z))}`}
+let down=null;R.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;const r=R.domElement.getBoundingClientRect();
+  const ray=new THREE.Raycaster();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
+  const vis=single()?shown():($('isolate').checked?meshes.filter(m=>m.userData.part===sel):meshes);const hit=ray.intersectObjects(vis,false)[0];if(!hit)return;
+  if(measOn){if(mPts.length===2)clearMeas();addPt(hit,e.clientX-r.left,e.clientY-r.top);return}
+  one=hit.object;if(hit.object.userData.part&&hit.object.userData.part!==sel)select(hit.object.userData.part,true);else paint3d()});
+
+/* ---------- PDF ---------- */
+let pdfMode='part',zoom=0,pdfShown=null,pageNo=1;
+async function initPdf(){if(!window.pdfjsLib)return;try{const t=await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js')).text();pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([t],{type:'text/javascript'}))}catch(e){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}}
+function curPdf(){const p=PARTS.find(x=>x.k===sel);return pdfMode==='main'?MAIN_PDF:(p&&p.pdfMeta)}
+async function loadPdf(){const m=curPdf(),box=$('pdfBox');$('pdfMain').disabled=!MAIN_PDF;
+  if(!m){box.innerHTML='<p class="empty" style="padding:20px">'+(pdfMode==='main'?'No main-views drawing in the Drawings folder.':'No drawing PDF for this part.')+'</p>';return}
+  if(!pdfDocs[m.id]){box.innerHTML='<p class="empty" style="padding:20px">'+(m.err?esc(m.err):'Loading drawing…')+'</p>';return}
+  if(pdfShown!==m.id){pdfShown=m.id;zoom=0;pageNo=1}renderPdf()}
+async function renderPdf(){const m=curPdf();if(!m||!pdfDocs[m.id])return;const doc=pdfDocs[m.id],box=$('pdfBox'),pg=await doc.getPage(pageNo),v0=pg.getViewport({scale:1});
+  const s=(box.clientWidth-24)/v0.width*Math.pow(1.4,zoom),dpr=Math.min(devicePixelRatio||1,2),v=pg.getViewport({scale:s*dpr});
+  const c=document.createElement('canvas');c.width=v.width;c.height=v.height;c.style.width=(v.width/dpr)+'px';c.style.height=(v.height/dpr)+'px';
+  await pg.render({canvasContext:c.getContext('2d'),viewport:v}).promise;box.innerHTML='';box.appendChild(c);
+  const L=$('pgL');if(doc.numPages>1){L.style.display='flex';L.innerHTML=`<button id="pgP" aria-label="Previous page" style="border:0;min-height:36px">‹</button> Page ${pageNo} / ${doc.numPages} <button id="pgN" aria-label="Next page" style="border:0;min-height:36px">›</button>`;$('pgP').onclick=()=>{if(pageNo>1){pageNo--;renderPdf()}};$('pgN').onclick=()=>{if(pageNo<doc.numPages){pageNo++;renderPdf()}}}else L.style.display='none'}
+$('pdfMain').onclick=()=>{pdfMode='main';loadPdf()};$('pdfPart').onclick=()=>{pdfMode='part';loadPdf()};
+$('zIn').onclick=()=>{zoom=Math.min(zoom+1,6);renderPdf()};$('zOut').onclick=()=>{zoom=Math.max(zoom-1,-2);renderPdf()};$('zFit').onclick=()=>{zoom=0;renderPdf()};
+
+/* ---------- DXF view ---------- */
+let vb=null,ext=null,dMeas=false,dPts=[],snaps=[];
+function drawDxf(){const p=PARTS.find(x=>x.k===sel),box=$('dxfBox');if(!p||!p.g){box.innerHTML='<p class="empty" style="padding:20px">'+(p&&p.dxfErr?esc(p.dxfErr):'Loading flat pattern…')+'</p>';$('dxfFacts').innerHTML='';return}
+  const g=p.g;snaps=[];
+  for(const q of g.polys){for(const pt of q.p)snaps.push(pt);for(let k=0;k<q.p.length-1;k++)snaps.push([(q.p[k][0]+q.p[k+1][0])/2,(q.p[k][1]+q.p[k+1][1])/2])}
+  for(const c of g.circles)snaps.push([c.x,c.y],[c.x+c.r,c.y],[c.x-c.r,c.y],[c.x,c.y+c.r],[c.x,c.y-c.r]);
+  ext=p.ext;const W=ext[2]-ext[0],H=ext[3]-ext[1];
+  const body=g.polys.map(q=>`<path d="M${q.p.map(pt=>pt[0]+' '+(-pt[1])).join('L')}" ${q.b?'class="bend"':''}/>`).join('')+g.circles.map(c=>`<circle cx="${c.x}" cy="${-c.y}" r="${c.r}" ${c.b?'class="bend"':''}/>`).join('');
+  box.innerHTML=`<svg id="dxfSvg" xmlns="http://www.w3.org/2000/svg"><g class="geo">${body}</g><g id="dm"></g></svg>`;dPts=[];fitDxf();
+  const holes=g.circles.filter(c=>!c.b),bends=g.polys.filter(q=>q.b).length,dia=[...new Set(holes.map(h=>f2(h.r*2)))];
+  $('dxfFacts').innerHTML=`<div>${esc(p.dxfMeta.name)}</div><div>Flat size <b>${f2(W)} × ${f2(H)} mm</b></div><div>Bend lines <b>${bends}</b> · Holes <b>${holes.length}${dia.length?' × Ø'+dia.join(', Ø'):''}</b></div><div id="dOut"></div>`;dOutMsg()}
+function dOutMsg(){const o=$('dOut');if(!o)return;if(!dMeas){o.textContent='';return}
+  if(dPts.length<2){o.innerHTML=`<span class="sub">Measure: tap ${dPts.length?'the second':'the first'} point (snaps to corners, midpoints, hole centres)</span>`;return}
+  const dx=dPts[1][0]-dPts[0][0],dy=dPts[1][1]-dPts[0][1];o.innerHTML=`Distance <b>${f2(Math.hypot(dx,dy))} mm</b> · ΔX ${f2(Math.abs(dx))} · ΔY ${f2(Math.abs(dy))}`}
+function drawDm(){const g=$('dm');if(!g||!vb)return;const s=vb[2]/$('dxfBox').clientWidth;
+  g.innerHTML=dPts.map(p=>`<circle cx="${p[0]}" cy="${-p[1]}" r="${s*5}" fill="#e4002b"/>`).join('')+(dPts.length===2?`<line x1="${dPts[0][0]}" y1="${-dPts[0][1]}" x2="${dPts[1][0]}" y2="${-dPts[1][1]}" stroke="#e4002b" stroke-width="${s*2}"/>`:'')}
+function setVb(){const s=$('dxfSvg');if(s){s.setAttribute('viewBox',vb.join(' '));drawDm()}}
+function fitDxf(){const b=$('dxfBox'),[x0,y0,x1,y1]=ext,pad=Math.max(x1-x0,y1-y0)*.06,w=x1-x0+2*pad,h=y1-y0+2*pad,ar=b.clientWidth/Math.max(b.clientHeight,1);
+  let vw=w,vh=h;if(w/h<ar)vw=h*ar;else vh=w/ar;vb=[(x0+x1)/2-vw/2,-(y0+y1)/2-vh/2,vw,vh];setVb()}
+$('dxfFit').onclick=()=>ext&&fitDxf();
+$('dxfM').onclick=()=>{dMeas=!dMeas;$('dxfM').classList.toggle('on',dMeas);$('dxfM').setAttribute('aria-pressed',dMeas);dPts=[];drawDm();dOutMsg();$('dxfBox').style.cursor=dMeas?'crosshair':''};
+const dbx=$('dxfBox');let drag=null;
+function zoomAt(f,cx,cy){const r=dbx.getBoundingClientRect();cx??=r.left+r.width/2;cy??=r.top+r.height/2;const px=vb[0]+(cx-r.left)/r.width*vb[2],py=vb[1]+(cy-r.top)/r.height*vb[3];vb=[px-(px-vb[0])*f,py-(py-vb[1])*f,vb[2]*f,vb[3]*f];setVb()}
+$('dIn').onclick=()=>vb&&zoomAt(1/1.4);$('dOut2').onclick=()=>vb&&zoomAt(1.4);
+dbx.addEventListener('wheel',e=>{if(!vb)return;e.preventDefault();zoomAt(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY)},{passive:false});
+const ptrs=new Map();let pinch=null;
+dbx.addEventListener('pointerdown',e=>{if(!vb)return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);dbx.setPointerCapture(e.pointerId);
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch=Math.hypot(a[0]-b[0],a[1]-b[1]);drag=null}else drag=[e.clientX,e.clientY,vb[0],vb[1]]});
+dbx.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;drag=null});
+dbx.addEventListener('pointermove',e=>{if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pinch&&ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(d>0){zoomAt(pinch/d,(a[0]+b[0])/2,(a[1]+b[1])/2);pinch=d}return}
+  if(!drag||!vb)return;const r=dbx.getBoundingClientRect();vb[0]=drag[2]-(e.clientX-drag[0])/r.width*vb[2];vb[1]=drag[3]-(e.clientY-drag[1])/r.height*vb[3];setVb()});
+dbx.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;drag=null;return}const d=drag;drag=null;if(!d||!dMeas||Math.hypot(e.clientX-d[0],e.clientY-d[1])>6)return;
+  const r=dbx.getBoundingClientRect(),px=r.width/vb[2],x=vb[0]+(e.clientX-r.left)/px,y=-(vb[1]+(e.clientY-r.top)/px);
+  let best=[x,y],bd=16;for(const s of snaps){const dd=Math.hypot(s[0]-x,s[1]-y)*px;if(dd<bd){bd=dd;best=s}}
+  if(dPts.length===2)dPts=[];dPts.push(best);drawDm();dOutMsg()});
+const roD=new ResizeObserver(()=>{if(tab==='dxf'&&ext)fitDxf()});roD.observe(dbx);
+}
+}
+</script>
+</body>
+</html>
