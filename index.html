@@ -215,7 +215,8 @@ const pdfDocs={},pdfBytes={},pageTexts={},picked=new Set();
 
 /* ---------- DXF parsing ---------- */
 function parseDxf(text){
-  const L=text.split(/\r?\n/),ents=[],unsupported={},texts=[];let txt=false;
+  const L=text.split(/\r?\n/),ents=[],unsupported={},texts=[],layerLt={};let txt=false;
+  {let inL=false,nm=null;for(let k=0;k<L.length-1;k+=2){const c=+L[k].trim(),v=L[k+1].trim();if(c===2&&v==='ENTITIES')break;if(c===0){inL=v==='LAYER';nm=null;continue}if(inL&&c===2)nm=v;if(inL&&c===6&&nm)layerLt[nm]=v}}
   let i=0;while(i<L.length-1&&!(L[i].trim()==='2'&&L[i+1].trim()==='ENTITIES'))i++;
   i+=2;let cur=null;
   const push=()=>{if(cur)ents.push(cur);cur=null};
@@ -224,19 +225,19 @@ function parseDxf(text){
       if(['LINE','CIRCLE','ARC','LWPOLYLINE'].includes(v))cur={t:v,layer:'0',pts:[],b:[]};else if(v==='TEXT'||v==='MTEXT'){cur=null;txt=true}else{unsupported[v]=(unsupported[v]||0)+1}if(v!=='TEXT'&&v!=='MTEXT')txt=false;continue}
     if(txt&&(c===1||c===3)){texts.push(v)}
     if(!cur)continue;
-    if(c===8)cur.layer=v;
+    if(c===8)cur.layer=v;else if(c===6)cur.lt=v;
     else if(cur.t==='LWPOLYLINE'){if(c===10)cur.pts.push([+v,0]),cur.b.push(0);else if(c===20)cur.pts[cur.pts.length-1][1]=+v;else if(c===42)cur.b[cur.b.length-1]=+v;else if(c===70)cur.closed=(+v&1)===1}
     else{if(c===10)cur.x=+v;else if(c===20)cur.y=+v;else if(c===11)cur.x2=+v;else if(c===21)cur.y2=+v;else if(c===40)cur.r=+v;else if(c===50)cur.a1=+v;else if(c===51)cur.a2=+v}}
   delete unsupported.SEQEND;delete unsupported.VERTEX;
-  return {ents,unsupported,texts};
+  return {ents,unsupported,texts,layerLt};
 }
-const isBend=l=>/bend/i.test(l);
+const DASH=/hidden|dash|center|phantom|dot|divide|border/i;let LAYER_LT={};const isBend=(l,lt)=>/bend/i.test(l)||DASH.test(lt||'')||(!lt||/bylayer/i.test(lt))&&DASH.test(LAYER_LT[l]||'');
 function arcPts(cx,cy,r,a1,a2){let s=a1*Math.PI/180,e=a2*Math.PI/180;if(e<=s)e+=2*Math.PI;const n=Math.max(4,Math.ceil((e-s)/(Math.PI/24))),o=[];for(let k=0;k<=n;k++){const a=s+(e-s)*k/n;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o}
 function bulgePts(p,q,b){if(!b)return [p,q];const th=4*Math.atan(b),d=Math.hypot(q[0]-p[0],q[1]-p[1]),r=d/(2*Math.sin(th/2)),mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,h=r*Math.cos(th/2),nx=-(q[1]-p[1])/d,ny=(q[0]-p[0])/d;
   const cx=mx+nx*h,cy=my+ny*h,a1=Math.atan2(p[1]-cy,p[0]-cx);const n=12,o=[];for(let k=0;k<=n;k++){const a=a1+th*k/n;o.push([cx+Math.abs(r)*Math.cos(a)*Math.sign(r)*Math.sign(r),cy+Math.abs(r)*Math.sin(a)])}o[0]=p;o[n]=q;return o}
 /* segments (non-bend), circles, polylines for drawing */
 function geom(d){const segs=[],polys=[],circles=[];
-  for(const e of d.ents){const b=isBend(e.layer);
+  LAYER_LT=d.layerLt||{};for(const e of d.ents){const b=isBend(e.layer,e.lt);
     if(e.t==='LINE'){polys.push({p:[[e.x,e.y],[e.x2,e.y2]],b});if(!b)segs.push([[e.x,e.y],[e.x2,e.y2]])}
     else if(e.t==='CIRCLE'){circles.push({x:e.x,y:e.y,r:e.r,b})}
     else if(e.t==='ARC'){const p=arcPts(e.x,e.y,e.r,e.a1,e.a2);polys.push({p,b});if(!b)for(let k=0;k<p.length-1;k++)segs.push([p[k],p[k+1]])}
@@ -408,7 +409,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" data-pdf="${p.pdfMeta?esc(p.pdfMeta.name+'#'+p.pdfMeta.page):''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Part '+p.k))}</span><span></span><span class="q">${p.t!=null?p.t+' mm · ':''}Qty ${p.qty??'?'}${p.rl?' (R&L)':''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" data-pdf="${p.pdfMeta?esc(p.pdfMeta.name+'#'+p.pdfMeta.page):''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Part '+p.k))}</span><span></span><span class="q">${p.t!=null?p.t+' mm · ':p.tModel?p.tModel+' mm · ':''}Qty ${p.qty??'?'}${p.rl?' (R&L)':''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
@@ -425,7 +426,7 @@ function renderReview(){const R=$('review');
    <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
    <div class="row2 acts"><button class="ap" id="bAp">Approve project</button><button class="rj" id="bRj">Request changes</button></div>
-   <div class="sub">After you press Approve or Request changes, choose WhatsApp or Email: your own app opens with a ready message listing every file — pick the designer and send. For a voice note, record it in that WhatsApp chat.</div>
+   <div class="sub">After you press Approve or Request changes, choose WhatsApp or Gmail: it opens with a ready message listing every file — pick the designer and send. For a voice note, record it in that WhatsApp chat.</div>
    <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
    <h2>Your decisions on this device</h2>
@@ -434,11 +435,14 @@ function renderReview(){const R=$('review');
 }
 /* ---------- send selected parts to a client ---------- */
 const libs={};function need(n,url){return libs[n]||(libs[n]=new Promise((ok,no)=>{if(window[n])return ok();const s=document.createElement('script');s.src=url;s.onload=ok;s.onerror=()=>no(new Error('Could not load '+n));document.head.appendChild(s)}))}
+const isMob=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const waUrl=(t,ph)=>(isMob?'https://api.whatsapp.com/send?':'https://web.whatsapp.com/send?')+(ph?'phone='+ph+'&':'')+'text='+encodeURIComponent(t);
+const gmailUrl=(to,su,body)=>'https://mail.google.com/mail/?view=cm&fs=1'+(to?'&to='+encodeURIComponent(to):'')+'&su='+encodeURIComponent(su)+'&body='+encodeURIComponent(body);
 const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
 function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.className='';S.innerHTML='';return}
   const ks=PARTS.filter(p=>picked.has(p.k)).map(p=>p.k);S.className='sendc';
   S.innerHTML=`<h2>Send to a client</h2><div class="sub">Part${ks.length>1?'s':''} ${ks.join(', ')} — DXF${PARTS.some(p=>picked.has(p.k)&&p.pdfMeta)?' and drawing':''} of each</div>
-   <div class="row2"><button id="shW" class="on">WhatsApp</button><button id="shM" class="on">Email</button></div>
+   <div class="row2"><button id="shW" class="on">WhatsApp</button><button id="shM" class="on">Gmail</button></div>
    <button id="zipF">Download files (ZIP)</button>
    <div class="msg" id="cMsg"></div>`;
   const M=(t,e)=>{$('cMsg').textContent=t;$('cMsg').className='msg'+(e?' err':'')};
@@ -447,8 +451,8 @@ function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.classNa
   const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
   const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  $('shW').onclick=()=>{open('https://wa.me/?text='+encodeURIComponent(waText()));M('WhatsApp opened with the message — choose the contact and send.')};
-  $('shM').onclick=()=>{const a=document.createElement('a');a.href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(mailBody());document.body.appendChild(a);a.click();a.remove();M('Your email app opened with the message — add the address and send.')};
+  $('shW').onclick=()=>{open(waUrl(waText()));M('WhatsApp opened with the message — choose the contact and send.')};
+  $('shM').onclick=()=>{open(gmailUrl('',title,mailBody()));M('Gmail opened with the message — write the address and send.')};
   $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
 async function partFiles(){const out=[];
@@ -478,7 +482,7 @@ function decide(decision){
     `Review page: ${location.href}`].filter(Boolean).join('\n');
   const subj=(decision==='approve'?'[APPROVED] ':'[CHANGES REQUESTED] ')+P.name;
   renderRail();renderReview();
-  $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2"><a class="btnl on" href="https://wa.me/${WA}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a><a class="btnl on" href="mailto:${encodeURIComponent(TO)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}">Email</a></div><button id="cpMsg">Copy message</button>`;
+  $('sendBox').innerHTML=`<div class="sub">Send it:</div><div class="row2"><a class="btnl on" href="${esc(waUrl(text,WA))}" target="_blank" rel="noopener">WhatsApp</a><a class="btnl on" href="${esc(gmailUrl(TO,subj,text))}" target="_blank" rel="noopener">Gmail</a></div><button id="cpMsg">Copy message</button>`;
   $('cpMsg').onclick=async()=>{try{await navigator.clipboard.writeText(text);$('cpMsg').textContent='Copied'}catch(e){msg('Copy failed — select the text manually.',1)}};
   
   msg(decision==='approve'?'Project approved — now press Send in the message.':'Saved — now press Send in the message.');
