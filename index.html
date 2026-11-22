@@ -409,7 +409,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" data-pdf="${p.pdfMeta?esc(p.pdfMeta.name+'#'+p.pdfMeta.page):''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Part '+p.k))}</span><span></span><span class="q">${p.t!=null?p.t+' mm · ':p.tModel?p.tModel+' mm · ':''}Qty ${p.qty??'?'}${p.rl?' (R&L)':''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" data-pdf="${p.pdfMeta?esc(p.pdfMeta.name+'#'+p.pdfMeta.page):''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Part '+p.k))}</span><span></span><span class="q">${p.t!=null?p.t+' mm · ':p.tModel?p.tModel+' mm · ':''}Qty ${p.qty??'?'}${p.rl?' (R&L)':''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?` <b style="color:var(--red)">· 3D has ${p.bodies}</b>`:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
@@ -425,7 +425,7 @@ function renderReview(){const R=$('review');
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
    <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
-   <div class="row2 acts"><button class="ap" id="bAp">Approve project</button><button class="rj" id="bRj">Request changes</button></div>
+   <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
    <div class="sub">Approve or Request changes opens WhatsApp (WhatsApp Web on a computer) with a short ready message — pick the designer and send. For a voice note, record it in that chat.</div>
    <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
@@ -439,14 +439,15 @@ const isMob=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 const waUrl=(t,ph)=>(isMob?'https://api.whatsapp.com/send?':'https://web.whatsapp.com/send?')+(ph?'phone='+ph+'&':'')+'text='+encodeURIComponent(t);
 const gmailUrl=(to,su,body)=>'https://mail.google.com/mail/?view=cm&fs=1'+(to?'&to='+encodeURIComponent(to):'')+'&su='+encodeURIComponent(su)+'&body='+encodeURIComponent(body);
 const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
-function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.className='';S.innerHTML='';return}
-  const ks=PARTS.filter(p=>picked.has(p.k)).map(p=>p.k);S.className='sendc';
-  S.innerHTML=`<h2>Send to a client</h2><div class="sub">Part${ks.length>1?'s':''} ${ks.join(', ')} — DXF${PARTS.some(p=>picked.has(p.k)&&p.pdfMeta)?' and drawing':''} of each</div>
+const chosen=()=>picked.size?PARTS.filter(p=>picked.has(p.k)):PARTS;
+function renderSend(){const S=$('sendc');if(!S||!PARTS.length)return;
+  const ks=chosen().map(p=>p.k),all=!picked.size;S.className='sendc';
+  S.innerHTML=`<h2>Send to a client</h2><div class="sub">${all?'All parts — tick parts on the left to send only those':'Part'+(ks.length>1?'s':'')+' '+ks.join(', ')} · DXF${chosen().some(p=>p.pdfMeta)?' and drawing':''} of each</div>
    <div class="row2"><button id="shW" class="on">WhatsApp</button><button id="shM" class="on">Gmail</button></div>
    <button id="zipF">Download files (ZIP)</button>
    <div class="msg" id="cMsg"></div>`;
   const M=(t,e)=>{$('cMsg').textContent=t;$('cMsg').className='msg'+(e?' err':'')};
-  const sel_=PARTS.filter(p=>picked.has(p.k)),title=`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`;
+  const sel_=chosen(),title=all?`${P.name} — all parts`:`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`;
   const partLines=()=>sel_.flatMap(p=>[`Part ${p.k}${p.nice?' – '+p.nice:''} (Qty ${p.qty??'?'}${p.rl?' R&L':''}, ${p.t!=null?p.t+' mm':p.tModel?p.tModel+' mm':''}):`,`• DXF: ${viewUrl(p.dxfMeta.id)}`,...(p.pdfMeta?[`• Drawing: ${viewUrl(p.pdfMeta.id)}${p.pdfMeta.page&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1?' (page '+p.pdfMeta.page+')':''}`]:[]),'']);
   const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
   const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
@@ -456,7 +457,7 @@ function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.classNa
   $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
 async function partFiles(){const out=[];
-  for(const p of PARTS.filter(p=>picked.has(p.k))){
+  for(const p of chosen()){
     if(p.dxfRaw!=null)out.push(new File([p.dxfRaw],p.dxfMeta.name,{type:'application/dxf'}));
     const m=p.pdfMeta;if(!m)continue;const b=pdfBytes[m.id];if(!b)continue;
     if(m.page&&pdfDocs[m.id]&&pdfDocs[m.id].numPages>1){await need('PDFLib','https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
@@ -465,7 +466,7 @@ async function partFiles(){const out=[];
     else out.push(new File([b],m.name,{type:'application/pdf'}))}
   if(!out.length)throw new Error('No files to send.');return out}
 async function zipDownload(fs){await need('JSZip','https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');const z=new JSZip();for(const f of fs)z.file(f.name,f);
-  const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(P.name+' - parts '+[...picked].join('')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+  const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.updated)})`:'—'}
 function decide(decision){
   const name=$('rvName').value.trim(),note=$('note').value.trim();
