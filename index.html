@@ -161,10 +161,7 @@ function landing(){
    <div class="lkrow"><input type="text" id="lkUrl" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url"><button id="lkGo" class="on">Open</button></div>
    <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders. Then send the page's link to the engineer.</div>
    <div class="msg" id="lkMsg"></div>
-  </div>
-  <div class="plist"><h2 style="margin:8px 0 4px">Recent projects</h2><div id="pl"></div></div>`;
-  let rc=[];try{rc=JSON.parse(ls.get('rv_recent')||'[]')}catch(e){}
-  $('pl').innerHTML=rc.length?rc.map(p=>`<a href="${esc(p.url)}">${esc(p.name)}<span>${new Date(p.at).toLocaleDateString()}</span></a>`).join(''):'<p class="empty">Projects opened on this device show up here.</p>';
+  </div>`;
   const go=async()=>{const M=$('lkMsg');M.className='msg';
     let L;try{L=parseLink($('lkUrl').value)}catch(e){M.textContent=e.message;M.className='msg err';$('lkUrl').focus();return}
     M.textContent='Opening…';location.href=APP_URL+'?f='+L.id+(L.rk?'&rk='+L.rk:'')};
