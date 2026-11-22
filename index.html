@@ -280,6 +280,31 @@ function splitCombined(){const cands=[];
   if(!MAIN_PDF){const m=cands.find(c=>!c.q&&!uC.has(c));if(m){MAIN_PDF={id:m.f.id,name:m.f.name,updated:m.f.updated,page:m.page};uC.add(m)}}
   const usedF=new Set([...uC].map(c=>c.f));P.extraPdf=(P.extraPdf||[]).filter(f=>!usedF.has(f))}
 
+/* ---------- which drawing page belongs to which part: by the dimensions written on it ---------- */
+let fillPdfSel=()=>{};
+function partDims(p){const d=new Set(),add=v=>{if(v>=5)d.add((+v).toFixed(1))};
+  if(p.ext){add(p.ext[2]-p.ext[0]);add(p.ext[3]-p.ext[1])}
+  const m=meshes.find(m=>m.userData.part===p.k);if(m)for(const v of m.userData.dims)add(v);
+  if(p.g)for(const c of p.g.circles)if(!c.b)add(c.r*2);
+  return d}
+function assignDrawings(){
+  const pages=[];for(const id in pageTexts){const f=[...P.pdf,...(P.otherPdf||[])].find(x=>x.id===id);if(!f)continue;
+    pageTexts[id].forEach((t,i)=>{const q=t.match(/QTY\s*:?\s*(\d+)\s*(\(\s*\d*\s*R\s*&\s*\d*\s*L\s*\))?/i);
+      pages.push({f,page:i+1,t,key:t.replace(/\s+/g,' ').trim(),single:pageTexts[id].length===1,nums:numsOf(t),q,asm:/explod|assembl|bill of material|\bBOM\b|main view|general arrangement/i.test(t)})})}
+  pages.sort((a,b)=>b.single-a.single);for(const p of PARTS){p.pdfMeta=null}MAIN_PDF=null;
+  if(!pages.length)return;
+  const dims=PARTS.map(p=>({p,d:partDims(p)})),freq={};for(const x of dims)for(const v of x.d)freq[v]=(freq[v]||0)+1;
+  const pairs=[];
+  for(const x of dims)for(const g of pages){if(g.asm)continue;let sc=0,hits=0;for(const v of x.d)if(g.nums.has(v)){sc+=1/freq[v];hits++}
+    if(!hits)continue;if(g.q){sc+=(x.p.qty!=null&&+g.q[1]===x.p.qty)?1.5:-2;if(!!g.q[2]===x.p.rl)sc+=0.5}else sc-=0.5;
+    pairs.push({p:x.p,g,sc})}
+  pairs.sort((a,b)=>b.sc-a.sc);const uP=new Set(),uG=new Set();
+  for(const x of pairs){if(x.sc<1.2||uP.has(x.p)||uG.has(x.g.key))continue;
+    const rival=pairs.find(y=>y.g===x.g&&y.p!==x.p&&!uP.has(y.p)&&y.sc>x.sc-0.25);if(rival&&!x.g.q)continue; // page fits several parts equally: an assembly sheet
+    uP.add(x.p);uG.add(x.g.key);x.p.pdfMeta={id:x.g.f.id,name:x.g.f.name,updated:x.g.f.updated,size:x.g.f.size,page:x.g.page,text:x.g.t}}
+  const rest=pages.filter(g=>!uG.has(g.key));const main=rest.find(g=>g.asm)||rest.find(g=>!g.q);
+  if(main)MAIN_PDF={id:main.f.id,name:main.f.name,updated:main.f.updated,page:main.page}}
+
 /* ---------- load ---------- */
 const loadMsg=t=>{$('loadMsg').textContent=t};
 (async()=>{
@@ -290,10 +315,7 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   try{let rc=JSON.parse(ls.get('rv_recent')||'[]').filter(x=>x.id!==P.id);rc.unshift({id:P.id,name:P.name,at:Date.now(),url:location.href});ls.set('rv_recent',JSON.stringify(rc.slice(0,12)))}catch(e){}try{reviews=JSON.parse(ls.get('rv_dec_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
   PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
   const keys=new Set(PARTS.map(p=>p.k));
-  {const strong=f=>{const b=f.name.replace(/\.[^.]+$/,''),m=b.match(/^(?:part|pt|p|st|sheet|item)[\s_.\-#]*([A-Za-z0-9]+)\b/i)||b.match(/[\s_\-](?:part|st)[\s_.\-#]*([A-Za-z0-9]+)\s*$/i);return m?m[1]:null};
-   const left=[];
-   for(const f of P.pdf){if(isMain(f.name)){MAIN_PDF=MAIN_PDF||f;continue}const k=strong(f),hit=k&&PARTS.find(p=>p.k.toLowerCase()===k.toLowerCase()&&!p.pdfMeta);if(hit)hit.pdfMeta=f;else left.push(f)}
-   for(const f of left){const tk=tokens(f.name);const hit=PARTS.find(p=>!p.pdfMeta&&tk[0]===p.k)||(/qty/i.test(f.name)?null:PARTS.find(p=>!p.pdfMeta&&tk[tk.length-1]===p.k));if(hit)hit.pdfMeta=f;else (P.extraPdf=P.extraPdf||[]).push(f)}}
+  P.extraPdf=[];
   stepMeta=P.steps[0]||null;
   $('pSub').textContent=`${PARTS.length} parts · ${PARTS.reduce((s,p)=>s+(p.qty||0),0)} pieces · model ${stepMeta?stepMeta.name:'missing'}`;
   sel=PARTS[0]?.k||null;renderRail();renderReview();
@@ -302,11 +324,13 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   renderRail();if(tab==='dxf')drawDxf();
   loadMsg('Loading drawings…');
   await initPdf();
-  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[]),...(P.extraPdf||[]),...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i).map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
+  await Promise.all([...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i).map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
     const pt=[];for(let n=1;n<=Math.min(doc.numPages,60);n++){const c=await (await doc.getPage(n)).getTextContent();pt.push(c.items.map(i=>i.str).join(' '))}pageTexts[m.id]=pt;m.text=pt.slice(0,3).join(' ')}catch(e){m.err=e.message}}));
-  splitCombined();renderRail();
+  assignDrawings();renderRail();
   {const all=[...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i&&pdfDocs[m.id]);
-   $('pdfSel').innerHTML='<option value="">All drawings ('+all.length+')…</option>'+all.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${pdfDocs[m.id].numPages>1?' — '+pdfDocs[m.id].numPages+' pages':''}</option>`).join('');
+   fillPdfSel=()=>{const used=new Set(PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta.id+'#'+p.pdfMeta.page)),o=m=>`<option value="${esc(m.id)}">${esc(m.name)}${pdfDocs[m.id].numPages>1?' — '+pdfDocs[m.id].numPages+' pages':''}</option>`;
+     const other=all.filter(m=>{for(let n=1;n<=pdfDocs[m.id].numPages;n++)if(!used.has(m.id+'#'+n))return true;return false}),parts=all.filter(m=>!other.includes(m));
+     $('pdfSel').innerHTML='<option value="">All drawings ('+all.length+')…</option>'+(parts.length?'<optgroup label="Part sheets">'+parts.map(o).join('')+'</optgroup>':'')+(other.length?'<optgroup label="Other drawings (assembly / not linked to one part)">'+other.map(o).join('')+'</optgroup>':'')};fillPdfSel();
    $('pdfSel').onchange=()=>{const id=$('pdfSel').value;if(!id)return;pdfFile=all.find(m=>m.id===id);pdfMode='file';loadPdf()}}
   if(tab==='pdf')loadPdf();
   if(stepMeta){loadMsg('Loading 3D model ('+(stepMeta.size/1048576).toFixed(1)+' MB)…');
@@ -317,7 +341,7 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
       build3d(res.meshes);
     }catch(e){loadMsg('3D model: '+e.message);P.stepErr=e.message}}
   else loadMsg((P.cad&&P.cad.length?'Only SolidWorks files found. ':'')+'Add a STEP export of the model to the project folder to see it in 3D.');
-  mapBodies();renderRail();renderReview();paint3d();
+  mapBodies();assignDrawings();fillPdfSel();renderRail();renderReview();paint3d();
   if(meshes.length){$('load3d').classList.add('hide');view('iso')}
 })();
 
@@ -383,7 +407,7 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t!=null?p.t+' mm':p.tModel?p.tModel+' mm (from model)':'? mm'}${p.nice&&sz?' · flat '+sz:''}${p.guess?'<br><b style="color:var(--red)">Matched by elimination — check its flat</b>':''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?`<br><b style="color:var(--red)">${p.bodies?'Model has '+p.bodies+' pcs':'Not found in the 3D model'}</b>`:''}${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" data-n="${p.bodies??''}" data-pdf="${p.pdfMeta?esc(p.pdfMeta.name+'#'+p.pdfMeta.page):''}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${esc(p.nice||('Flat '+sz)||p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t!=null?p.t+' mm':p.tModel?p.tModel+' mm (from model)':'? mm'}${p.nice&&sz?' · flat '+sz:''}${p.guess?'<br><b style="color:var(--red)">Matched by elimination — check its flat</b>':''}${meshes.length&&p.bodies!=null&&p.qty!=null&&p.bodies!==p.qty?`<br><b style="color:var(--red)">${p.bodies?'Model has '+p.bodies+' pcs':'Not found in the 3D model'}</b>`:''}${p.pdfMeta?' · drawing ✓':' · no drawing found'}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
 $('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
 $('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
