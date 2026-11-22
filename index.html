@@ -28,6 +28,8 @@ aside{border-right:1px solid var(--line)}
 .rail-h{padding:12px 14px;font-size:13px;color:var(--mute);border-bottom:1px solid var(--line)}
 .part{display:grid;grid-template-columns:34px 1fr auto;gap:2px 10px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);width:100%;text-align:left;background:none;min-height:56px}
 .part .k{font-size:24px;grid-row:span 2}.part .n{font-weight:600;font-size:14px}.part .q{font-size:12px;color:var(--mute)}
+.prow{position:relative}.prow .part{padding-right:48px}.pk{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}.pk input{width:20px;height:20px;accent-color:var(--red);cursor:pointer}
+.sendc{border:2px solid var(--red);padding:12px;display:flex;flex-direction:column;gap:10px}
 .part.sel{background:var(--soft);box-shadow:inset 4px 0 0 var(--ink)}
 .dot{width:12px;height:12px;border:2px solid var(--mute);border-radius:50%;grid-row:span 2}
 .dot.approved{background:var(--ink);border-color:var(--ink)}.dot.rejected{background:var(--red);border-color:var(--red)}.dot.stale{border-color:var(--red);border-style:dashed}
@@ -90,7 +92,7 @@ textarea{min-height:84px;resize:vertical}
 .plist a{display:flex;justify-content:space-between;gap:12px;padding:16px 0;border-bottom:1px solid var(--line);text-decoration:none;font-weight:600;font-size:17px}
 .plist a span{color:var(--mute);font-weight:400;font-size:14px;white-space:nowrap}
 @media(max-width:1100px){main{grid-template-columns:200px minmax(0,1fr)}.review{grid-column:1/-1;border-left:0;border-top:1.5px solid var(--ink)}}
-@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}aside{border-right:0}#rail{display:flex;overflow-x:auto}.part{min-width:190px;border-right:1px solid var(--line)}.rail-h{display:none}.pane{min-height:430px}.tool button{padding:0 10px}.tool label{padding:0 8px}.hint{display:none}.mout{top:110px}.facts{left:12px;right:12px;max-width:none}}
+@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}aside{border-right:0}#rail{display:flex;overflow-x:auto}.prow{min-width:200px;border-right:1px solid var(--line)}.rail-h{display:none}.pane{min-height:430px}.tool button{padding:0 10px}.tool label{padding:0 8px}.hint{display:none}.mout{top:110px}.facts{left:12px;right:12px;max-width:none}}
 @media(prefers-reduced-motion:reduce){.bar i{animation:none;width:100%}}
 </style>
 </head>
@@ -186,7 +188,7 @@ $('app').innerHTML=`
   <div class="release"><div class="stamp no" id="stamp">Not approved yet</div></div>
 </header>
 <main>
-  <aside><div class="rail-h">Parts — click to review</div><div id="rail"></div></aside>
+  <aside><div class="rail-h">Parts — click to view · tick to send to a client</div><div id="rail"></div></aside>
   <section class="center">
     <div class="tabs" id="tabs">
       <button data-t="3d" class="on">3D model</button><button data-t="pdf">Drawing (PDF)</button><button data-t="dxf">Flat pattern (DXF)</button>
@@ -220,7 +222,7 @@ init();
 
 function init(){
 let P=null, PARTS=[], sel=null, tab='3d', reviews=[], stepMeta=null, MAIN_PDF=null, CHECKS=[];
-const pdfDocs={};
+const pdfDocs={},pdfBytes={},pageTexts={},picked=new Set();
 
 /* ---------- DXF parsing ---------- */
 function parseDxf(text){
@@ -270,6 +272,22 @@ function partFromDxf(m){const base=m.name.replace(/\.dxf$/i,'');const k=(base.ma
 const tokens=n=>n.replace(/\.[^.]+$/,'').split(/[\s_.\-()]+/).filter(Boolean);
 const isMain=n=>/main|assembly|assy|general/i.test(n);
 
+/* ---------- one PDF with many pages: find each part's page ---------- */
+function numsOf(t){const out=new Set();for(const tok of t.split(/\s+/))for(const x of [tok,[...tok].reverse().join('')]){const m=x.match(/^[^\d]*?(\d+(?:\.\d+)?)[^\d]*$/);if(m)out.add((+m[1]).toFixed(1))}return out}
+function splitCombined(){const cands=[];
+  for(const f of (P.extraPdf||[])){const pt=pageTexts[f.id];if(!pt)continue;let qi=0;
+    pt.forEach((t,i)=>{const q=t.match(/QTY\s*:?\s*(\d+)\s*(\(\s*\d*\s*R\s*&\s*\d*\s*L\s*\))?/i);cands.push({f,page:i+1,q,nums:numsOf(t),t,qi:q?qi++:-1})})}
+  if(!cands.length)return;
+  const need=PARTS.filter(p=>!p.pdfMeta),pairs=[];
+  for(const p of need)for(const c of cands){if(!c.q)continue;let sc=(p.qty!=null&&+c.q[1]===p.qty)?3:-3;if(!!c.q[2]===p.rl)sc+=2;
+    if(p.ext)for(const d of [p.ext[2]-p.ext[0],p.ext[3]-p.ext[1]])if(c.nums.has((+d).toFixed(1)))sc+=2;
+    if(PARTS.indexOf(p)===c.qi)sc+=1;pairs.push({p,c,sc})}
+  pairs.sort((a,b)=>b.sc-a.sc);const uP=new Set(),uC=new Set();
+  for(const x of pairs){if(x.sc<3||uP.has(x.p)||uC.has(x.c))continue;uP.add(x.p);uC.add(x.c);
+    x.p.pdfMeta={id:x.c.f.id,name:x.c.f.name,updated:x.c.f.updated,size:x.c.f.size,page:x.c.page,text:x.c.t}}
+  if(!MAIN_PDF){const m=cands.find(c=>!c.q&&!uC.has(c));if(m){MAIN_PDF={id:m.f.id,name:m.f.name,updated:m.f.updated,page:m.page};uC.add(m)}}
+  const usedF=new Set([...uC].map(c=>c.f));P.extraPdf=(P.extraPdf||[]).filter(f=>!usedF.has(f))}
+
 /* ---------- load ---------- */
 const loadMsg=t=>{$('loadMsg').textContent=t};
 (async()=>{
@@ -286,12 +304,13 @@ const loadMsg=t=>{$('loadMsg').textContent=t};
   $('pSub').textContent=`${PARTS.length} parts · ${PARTS.reduce((s,p)=>s+(p.qty||0),0)} pieces · model ${stepMeta?stepMeta.name:'missing'}`;
   sel=PARTS[0]?.k||null;renderRail();renderReview();
   loadMsg(`Loading ${PARTS.length} flat patterns…`);
-  await Promise.all(PARTS.map(async p=>{try{p.dxf=parseDxf(await fileText(p.dxfMeta.id));p.g=geom(p.dxf);p.fa=flatArea(p.g);p.ext=extents(p.g)}catch(e){p.dxfErr=e.message}}));
+  await Promise.all(PARTS.map(async p=>{try{p.dxfRaw=await fileText(p.dxfMeta.id);p.dxf=parseDxf(p.dxfRaw);p.g=geom(p.dxf);p.fa=flatArea(p.g);p.ext=extents(p.g)}catch(e){p.dxfErr=e.message}}));
   renderRail();if(tab==='dxf')drawDxf();
   loadMsg('Loading drawings…');
   await initPdf();
-  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[])].map(async m=>{try{const doc=await pdfjsLib.getDocument({data:await fileBytes(m.id)}).promise;pdfDocs[m.id]=doc;
-    let txt='';for(let n=1;n<=Math.min(doc.numPages,3);n++){const c=await (await doc.getPage(n)).getTextContent();txt+=' '+c.items.map(i=>i.str).join(' ')}m.text=txt}catch(e){m.err=e.message}}));
+  await Promise.all([...PARTS.filter(p=>p.pdfMeta).map(p=>p.pdfMeta),...(MAIN_PDF?[MAIN_PDF]:[]),...(P.extraPdf||[])].map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
+    const pt=[];for(let n=1;n<=Math.min(doc.numPages,60);n++){const c=await (await doc.getPage(n)).getTextContent();pt.push(c.items.map(i=>i.str).join(' '))}pageTexts[m.id]=pt;m.text=pt.slice(0,3).join(' ')}catch(e){m.err=e.message}}));
+  splitCombined();renderRail();
   if(tab==='pdf')loadPdf();
   if(stepMeta){loadMsg('Loading 3D model ('+(stepMeta.size/1048576).toFixed(1)+' MB)…');
     try{const stepBytes=await fileBytes(stepMeta.id);loadMsg('Reading 3D model — first time can take ~10 s…');
@@ -362,9 +381,10 @@ function projStatus(){const l=reviews.slice().sort((a,b)=>a.at<b.at?1:-1)[0];
   return l.decision==='approve'?{s:'approved',label:'Project approved'}:{s:'rejected',label:'Changes requested'}}
 function renderRail(){
   $('rail').innerHTML=PARTS.map(p=>{const sz=p.ext?`${f2(p.ext[2]-p.ext[0])} × ${f2(p.ext[3]-p.ext[1])}`:'';
-    return `<button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm</span></button>`}).join('');
+    return `<div class="prow"><button class="part ${p.k===sel?'sel':''}" data-k="${esc(p.k)}" aria-label="Part ${esc(p.k)}"><span class="k">${esc(p.k)}</span><span class="n">${sz?'Flat '+sz:esc(p.dxfMeta.name)}</span><span></span><span class="q">Qty ${p.qty??'?'}${p.rl?' (R&L)':''} · ${p.t??'?'} mm${p.pdfMeta&&p.pdfMeta.page?' · sheet p.'+p.pdfMeta.page:''}</span></button><label class="pk" title="Select to send to a client"><input type="checkbox" data-pick="${esc(p.k)}" ${picked.has(p.k)?'checked':''} aria-label="Select part ${esc(p.k)} to send to a client"></label></div>`}).join('');
   const st=projStatus(),el=$('stamp');el.textContent=st.s==='approved'?'Approved for fabrication':st.label;el.className='stamp'+(st.s==='approved'?'':' no')}
-$('rail').addEventListener('click',e=>{const b=e.target.closest('.part');if(b)select(b.dataset.k)});
+$('rail').addEventListener('click',e=>{if(e.target.closest('.pk'))return;const b=e.target.closest('.part');if(b)select(b.dataset.k)});
+$('rail').addEventListener('change',e=>{const c=e.target.closest('[data-pick]');if(!c)return;c.checked?picked.add(c.dataset.pick):picked.delete(c.dataset.pick);renderSend()});
 
 /* ---------- review panel (decision is sent by WhatsApp / email) ---------- */
 const fmtT=t=>new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -373,7 +393,7 @@ function renderReview(){const R=$('review');
   if(!P){R.innerHTML='';return}
   const st=projStatus(),ev=reviews.slice().sort((a,b)=>a.at<b.at?1:-1),dest=[WA?'WhatsApp':'',TO?'email':''].filter(Boolean).join(' or ');
   const pieces=PARTS.reduce((s,p)=>s+(p.qty||0),0);
-  R.innerHTML=`<div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
+  R.innerHTML=`<div id="sendc"></div><div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
    <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':''}"></textarea>
@@ -383,9 +403,42 @@ function renderReview(){const R=$('review');
    <div class="msg" id="msg"></div>
    <h2>Your decisions on this device</h2>
    <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Project approved':'Changes requested'}</span> · <b>${esc(e.name)}</b><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle()?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
-  $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');
+  $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');renderSend();
 }
-function fileLine(m){return m?`${m.name} (${fmtT(m.updated)})`:'—'}
+/* ---------- send selected parts to a client ---------- */
+const libs={};function need(n,url){return libs[n]||(libs[n]=new Promise((ok,no)=>{if(window[n])return ok();const s=document.createElement('script');s.src=url;s.onload=ok;s.onerror=()=>no(new Error('Could not load '+n));document.head.appendChild(s)}))}
+const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
+function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.className='';S.innerHTML='';return}
+  const ks=PARTS.filter(p=>picked.has(p.k)).map(p=>p.k);S.className='sendc';
+  S.innerHTML=`<h2>Send to a client</h2><div class="sub">Part${ks.length>1?'s':''} ${ks.join(', ')} — DXF${PARTS.some(p=>picked.has(p.k)&&p.pdfMeta)?' and drawing':''} of each</div>
+   <div class="row2"><input type="tel" id="cWa" placeholder="Client WhatsApp, e.g. 2010…" aria-label="Client WhatsApp number" value="${esc(ls.get('rv_cwa'))}"><input type="email" id="cMail" placeholder="Client email" aria-label="Client email" value="${esc(ls.get('rv_cmail'))}"></div>
+   <div class="row2"><button id="shF" class="on">Share files</button><button id="zipF">Download ZIP</button></div>
+   <div class="row2"><button id="lkW">WhatsApp with links</button><button id="lkM">Email with links</button></div>
+   <div class="sub">"Share files" sends the real files through WhatsApp, Gmail… (phone or PC share menu). The link buttons send Drive links instead.</div>
+   <div class="msg" id="cMsg"></div>`;
+  const M=(t,e)=>{$('cMsg').textContent=t;$('cMsg').className='msg'+(e?' err':'')};
+  const keep=()=>{ls.set('rv_cwa',$('cWa').value.replace(/\D/g,''));ls.set('rv_cmail',$('cMail').value.trim())};
+  $('shF').onclick=async()=>{keep();M('Preparing files…');try{const fs=await partFiles();
+      if(navigator.canShare&&navigator.canShare({files:fs})){await navigator.share({files:fs,title:P.name,text:`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`});M('Shared.')}
+      else{await zipDownload(fs);M('This browser can\'t share files directly, so a ZIP was downloaded — attach it in WhatsApp or email.')}}
+    catch(e){if(e&&e.name==='AbortError')M('');else M(e.message||'Could not share.',1)}};
+  $('zipF').onclick=async()=>{keep();M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
+  const linkText=()=>[`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`,...PARTS.filter(p=>picked.has(p.k)).flatMap(p=>[``,`Part ${p.k} (Qty ${p.qty??'?'}${p.rl?' R&L':''}, ${p.t??'?'} mm):`,`• DXF: ${viewUrl(p.dxfMeta.id)}`,p.pdfMeta?`• Drawing: ${viewUrl(p.pdfMeta.id)}${p.pdfMeta.page?' (page '+p.pdfMeta.page+')':''}`:''].filter(x=>x!==''||true))].join('\n');
+  $('lkW').onclick=()=>{keep();const n=$('cWa').value.replace(/\D/g,'');const a=document.createElement('a');a.href='https://wa.me/'+n+'?text='+encodeURIComponent(linkText());a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
+  $('lkM').onclick=()=>{keep();const a=document.createElement('a');a.href='mailto:'+encodeURIComponent($('cMail').value.trim())+'?subject='+encodeURIComponent(P.name+' — parts '+ks.join(', '))+'&body='+encodeURIComponent(linkText());document.body.appendChild(a);a.click();a.remove()};
+}
+async function partFiles(){const out=[];
+  for(const p of PARTS.filter(p=>picked.has(p.k))){
+    if(p.dxfRaw!=null)out.push(new File([p.dxfRaw],p.dxfMeta.name,{type:'application/dxf'}));
+    const m=p.pdfMeta;if(!m)continue;const b=pdfBytes[m.id];if(!b)continue;
+    if(m.page&&pdfDocs[m.id]&&pdfDocs[m.id].numPages>1){await need('PDFLib','https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
+      const src=await PDFLib.PDFDocument.load(b),d=await PDFLib.PDFDocument.create(),[pg]=await d.copyPages(src,[m.page-1]);d.addPage(pg);
+      out.push(new File([await d.save()],`${p.k}_drawing.pdf`,{type:'application/pdf'}))}
+    else out.push(new File([b],m.name,{type:'application/pdf'}))}
+  if(!out.length)throw new Error('No files to send.');return out}
+async function zipDownload(fs){await need('JSZip','https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');const z=new JSZip();for(const f of fs)z.file(f.name,f);
+  const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(P.name+' - parts '+[...picked].join('')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.updated)})`:'—'}
 function decide(decision){
   const name=$('rvName').value.trim(),note=$('note').value.trim();
   if(!name){msg('Write your name first.',1);$('rvName').focus();return}
@@ -474,7 +527,7 @@ function curPdf(){const p=PARTS.find(x=>x.k===sel);return pdfMode==='main'?MAIN_
 async function loadPdf(){const m=curPdf(),box=$('pdfBox');$('pdfMain').disabled=!MAIN_PDF;
   if(!m){box.innerHTML='<p class="empty" style="padding:20px">'+(pdfMode==='main'?'No main-views drawing in the Drawings folder.':'No drawing PDF for this part.')+'</p>';return}
   if(!pdfDocs[m.id]){box.innerHTML='<p class="empty" style="padding:20px">'+(m.err?esc(m.err):'Loading drawing…')+'</p>';return}
-  if(pdfShown!==m.id){pdfShown=m.id;zoom=0;pageNo=1}renderPdf()}
+  const key=m.id+'#'+(m.page||1);if(pdfShown!==key){pdfShown=key;zoom=0;pageNo=m.page||1}renderPdf()}
 async function renderPdf(){const m=curPdf();if(!m||!pdfDocs[m.id])return;const doc=pdfDocs[m.id],box=$('pdfBox'),pg=await doc.getPage(pageNo),v0=pg.getViewport({scale:1});
   const s=(box.clientWidth-24)/v0.width*Math.pow(1.4,zoom),dpr=Math.min(devicePixelRatio||1,2),v=pg.getViewport({scale:s*dpr});
   const c=document.createElement('canvas');c.width=v.width;c.height=v.height;c.style.width=(v.width/dpr)+'px';c.style.height=(v.height/dpr)+'px';
