@@ -439,18 +439,16 @@ function renderSend(){const S=$('sendc');if(!S)return;if(!picked.size){S.classNa
   S.innerHTML=`<h2>Send to a client</h2><div class="sub">Part${ks.length>1?'s':''} ${ks.join(', ')} — DXF${PARTS.some(p=>picked.has(p.k)&&p.pdfMeta)?' and drawing':''} of each</div>
    <div class="row2"><button id="shW" class="on">WhatsApp</button><button id="shM" class="on">Email</button></div>
    <button id="zipF">Download files (ZIP)</button>
-   <div class="sub">Opens your own WhatsApp or email with the files attached — you pick who to send to. On a computer where that isn't possible, the files download and WhatsApp / Gmail opens so you can attach them.</div>
+   <div class="sub">WhatsApp and Email open your own app with a ready message holding the file links — you choose who to send it to. Download gives you the files themselves.</div>
    <div class="msg" id="cMsg"></div>`;
   const M=(t,e)=>{$('cMsg').textContent=t;$('cMsg').className='msg'+(e?' err':'')};
-  const title=`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`;
+  const sel_=PARTS.filter(p=>picked.has(p.k)),title=`${P.name} — part${ks.length>1?'s':''} ${ks.join(', ')}`;
+  const partLines=()=>sel_.flatMap(p=>[`Part ${p.k}${p.nice?' – '+p.nice:''} (Qty ${p.qty??'?'}${p.rl?' R&L':''}, ${p.t!=null?p.t+' mm':p.tModel?p.tModel+' mm':''}):`,`• DXF: ${viewUrl(p.dxfMeta.id)}`,...(p.pdfMeta?[`• Drawing: ${viewUrl(p.pdfMeta.id)}${p.pdfMeta.page&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1?' (page '+p.pdfMeta.page+')':''}`]:[]),'']);
+  const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
+  const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  const go=async app=>{M('Preparing files…');let fs;try{fs=await partFiles()}catch(e){M(e.message,1);return}
-    if(navigator.canShare&&navigator.canShare({files:fs})){try{await navigator.share({files:fs,title,text:title});M('Done.');return}catch(e){if(e&&e.name==='AbortError'){M('');return}}}
-    try{await zipDownload(fs)}catch(e){M(e.message,1);return}
-    if(app==='wa')open('https://web.whatsapp.com/send?text='+encodeURIComponent(title+' — files attached'));
-    else open('https://mail.google.com/mail/?view=cm&fs=1&su='+encodeURIComponent(title)+'&body='+encodeURIComponent('Please find attached the DXF and drawing files for '+title+'.'));
-    M(app==='wa'?'The files were downloaded as a ZIP and WhatsApp opened — choose the contact, then attach the ZIP (paperclip) and send.':'The files were downloaded as a ZIP and a new Gmail message opened — attach the ZIP, write the address and send.')};
-  $('shW').onclick=()=>go('wa');$('shM').onclick=()=>go('mail');
+  $('shW').onclick=()=>{open('https://wa.me/?text='+encodeURIComponent(waText()));M('WhatsApp opened with the message — choose the contact and send.')};
+  $('shM').onclick=()=>{const a=document.createElement('a');a.href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(mailBody());document.body.appendChild(a);a.click();a.remove();M('Your email app opened with the message — add the address and send.')};
   $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
 async function partFiles(){const out=[];
