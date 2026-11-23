@@ -85,7 +85,7 @@ textarea{min-height:84px;resize:vertical}#lkUrl{min-height:0;height:48px;resize:
 .drop .pick{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1.5px solid var(--ink);cursor:pointer;background:var(--bg)}
 .upl{max-width:760px;padding:0 max(3vw,14px) 24px;display:flex;flex-direction:column;gap:10px}
 .upl.panel{padding:16px max(3vw,14px);border-top:1.5px solid var(--ink);max-width:none}
-.upl[hidden],#upMore[hidden]{display:none!important}
+.upl[hidden],#upMore[hidden],button[hidden]{display:none!important}
 .row2 button.off,.row2 button:disabled{opacity:.35;cursor:not-allowed}
 .crow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.cbtn{display:flex;gap:8px;flex-wrap:wrap}.cbtn button{min-height:40px;padding:0 14px}
 .lkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
@@ -218,7 +218,7 @@ $('app').innerHTML=`
         <label>Explode <input type="range" id="explode" min="0" max="100" value="0" aria-label="Explode distance"></label>
         <label><input type="checkbox" id="isolate"> Selected only</label>
         <label><input type="checkbox" id="single"> Isolate</label>
-        <button id="mBtn" aria-pressed="false">Measure</button><button id="fit">Fit</button><button id="vIso">Iso</button><button id="vTop">Top</button><button id="vFront">Front</button>
+        <button id="mBtn" aria-pressed="false" hidden>Measure</button><button id="fit">Fit</button><button id="vIso">Iso</button><button id="vTop">Top</button><button id="vFront">Front</button>
       </div>
       <div class="mlabel" id="mLabel"></div><div class="mtip" id="mTip"></div>
       <div class="mout"><span id="pieceNote"></span> <span id="mOut"></span></div>
@@ -230,7 +230,7 @@ $('app').innerHTML=`
       <div id="pdfBox"></div>
     </div>
     <div class="pane" id="p-dxf">
-      <div class="tool"><button id="dxfFit">Fit</button><button id="dxfM" aria-pressed="false">Measure</button><button id="dIn" aria-label="Zoom in">+</button><button id="dOut2" aria-label="Zoom out">−</button></div>
+      <div class="tool"><button id="dxfFit">Fit</button><button id="dxfM" aria-pressed="false" hidden>Measure</button><button id="dIn" aria-label="Zoom in">+</button><button id="dOut2" aria-label="Zoom out">−</button></div>
       <div id="dxfBox"></div><div class="facts" id="dxfFacts"></div>
     </div>
   </section>
