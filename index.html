@@ -104,7 +104,6 @@ textarea{min-height:84px;resize:vertical}
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/occt-import-js.js"></script>
 <script>
 {
@@ -114,6 +113,8 @@ const API_KEY='AIzaSyATYc_75Jeq6O8q4IRGJcoqrRK11e-9Vuc';   // Google Drive API k
 const Q=new URLSearchParams(location.search);
 const PROJECT_ID=(Q.get('f')||'').replace(/[^\w-]/g,''),RKEY=(Q.get('rk')||'').replace(/[^\w-]/g,''),WA=(Q.get('wa')||'').replace(/\D/g,''),TO=(Q.get('to')||'').trim();
 const APP_URL=location.origin+location.pathname;
+/* PDF.js: viewer and worker always from the same version */
+const PDFJS='https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/build/';let pdfjsLib=null;
 const OCCT_BASE='https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -326,7 +327,7 @@ const loadErr=t=>{$('loadMsg').textContent=t;$('load3d').classList.add('err')};
   renderRail();if(tab==='dxf')drawDxf();
   loadMsg('Loading drawings…');
   await initPdf();
-  await Promise.all([...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i).map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({data:by}).promise;pdfDocs[m.id]=doc;
+  await Promise.all([...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i).map(async m=>{try{const by=await fileBytes(m.id);pdfBytes[m.id]=by.slice();const doc=await pdfjsLib.getDocument({isEvalSupported:false,data:by}).promise;pdfDocs[m.id]=doc;
     const pt=[];for(let n=1;n<=Math.min(doc.numPages,60);n++){const c=await (await doc.getPage(n)).getTextContent();pt.push(c.items.map(i=>i.str).join(' '))}pageTexts[m.id]=pt;m.text=pt.slice(0,3).join(' ')}catch(e){m.err=e.message}}));
   assignDrawings();renderRail();
   {const all=[...P.pdf,...(P.otherPdf||[])].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i&&pdfDocs[m.id]);
@@ -612,7 +613,10 @@ R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-dow
 
 /* ---------- PDF ---------- */
 let pdfMode='part',zoom=0,pdfShown=null,pageNo=1;
-async function initPdf(){if(!window.pdfjsLib)return;try{const t=await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js')).text();pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([t],{type:'text/javascript'}))}catch(e){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}}
+async function initPdf(){if(pdfjsLib)return;
+  try{pdfjsLib=await import(PDFJS+'pdf.min.mjs')}catch(e){pdfjsLib=null;return}
+  try{const t=await (await fetch(PDFJS+'pdf.worker.min.mjs')).text();pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([t],{type:'text/javascript'}))}
+  catch(e){pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.mjs'}}
 let pdfFile=null;function curPdf(){const p=PARTS.find(x=>x.k===sel);return pdfMode==='file'?pdfFile:pdfMode==='main'?MAIN_PDF:(p&&p.pdfMeta)}
 async function loadPdf(){const m=curPdf(),box=$('pdfBox');$('pdfMain').disabled=!MAIN_PDF;
   if(!m){box.innerHTML='<p class="empty" style="padding:20px">'+(pdfMode==='main'?'No main-views drawing in the Drawings folder.':'No sheet is linked to this part — pick any drawing from the "All drawings" list above.')+'</p>';return}
