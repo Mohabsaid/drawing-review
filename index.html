@@ -151,7 +151,7 @@ const fileBytes=id=>media(id),fileText=async id=>new TextDecoder('latin1').decod
 function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
   if(!m){if(/\/file\/d\//.test(s))throw new Error('That is a link to a single file. Paste the link of the FOLDER.');throw new Error('Paste the link of a Google Drive folder (it contains /folders/).')}
   return {id:m[1],rk:(s.match(/resourcekey=([\w-]+)/)||[])[1]||''}}
-try{localStorage.removeItem('rv_recent');localStorage.removeItem('rv_name');Object.keys(localStorage).filter(k=>k.startsWith('rv_dec_')).forEach(k=>localStorage.removeItem(k))}catch(e){}
+try{localStorage.removeItem('rv_recent');localStorage.removeItem('rv_name');Object.keys(localStorage).filter(k=>k.startsWith('rv_dec_')||k.startsWith('rv_ap2_')).forEach(k=>localStorage.removeItem(k))}catch(e){}
 const ls={get:k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const b64u8=b=>{const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
 
@@ -343,7 +343,7 @@ const loadErr=t=>{$('loadMsg').textContent=t;$('load3d').classList.add('err')};
     P=await scanProject(PROJECT_ID);
   }catch(e){$('pName').textContent='Project not available';loadErr(e.message);return}
   $('pName').textContent=P.name;
-  try{reviews=JSON.parse(ls.get('rv_ap2_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
+  try{reviews=JSON.parse(ls.get('rv_ap3_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
   PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
   const keys=new Set(PARTS.map(p=>p.k));
   P.extraPdf=[];
@@ -499,7 +499,7 @@ async function zipDownload(fs,nm){await need('JSZip','https://cdnjs.cloudflare.c
 function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.updated)})`:'—'}
 function decide(decision){
   const name='',note='';
-    reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_ap2_'+PROJECT_ID,JSON.stringify(reviews));
+    reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_ap3_'+PROJECT_ID,JSON.stringify(reviews));
   const text=[(decision==='approve'?'*PROJECT APPROVED* for fabrication':'*CHANGES REQUESTED*')+` — ${P.name}`,
     `Time: ${fmtT(Date.now())}`,
     note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
