@@ -86,6 +86,7 @@ textarea{min-height:84px;resize:vertical}#lkUrl{min-height:0;height:48px;resize:
 .upl{max-width:760px;padding:0 max(3vw,14px) 24px;display:flex;flex-direction:column;gap:10px}
 .upl.panel{padding:16px max(3vw,14px);border-top:1.5px solid var(--ink);max-width:none}
 .upl[hidden],#upMore[hidden]{display:none!important}
+.row2 button.off,.row2 button:disabled{opacity:.35;cursor:not-allowed}
 .crow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.cbtn{display:flex;gap:8px;flex-wrap:wrap}.cbtn button{min-height:40px;padding:0 14px}
 .lkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 .or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px}.or::before,.or::after{content:'';flex:1;border-top:1px solid var(--line)}
@@ -474,14 +475,13 @@ function renderSend(){const S=$('sendc');if(!S||!PARTS.length)return;
   const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
   const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  const fileList=()=>sel_.map(p=>`${p.dxfMeta.name.replace(/\.dxf$/i,'')} (Qty ${p.qty??'?'}${p.rl?' R&L':''}${p.t!=null?', '+p.t+' mm':p.tModel?', '+p.tModel+' mm':''})`);
-  const link=()=>APP_URL+'?c='+enc64({t:title,i:sel_.map(p=>[p.dxfMeta.name,p.dxfMeta.id,p.pdfMeta?p.pdfMeta.id:'',p.pdfMeta&&p.pdfMeta.page&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1?p.pdfMeta.page:0,p.qty??null,p.t!=null?p.t:(p.tModel??null),p.rl?1:0])});
-  const waShort=()=>[`*${title}*`,...fileList().map(l=>'• '+l),'',`DXF and drawing of each part: ${link()}`].join('\n');
-  const mailShort=()=>['Hello,','',`Please find the manufacturing files for ${title} (DXF and drawing of each part) here:`,link(),'',...fileList().map(l=>'• '+l),'','Please confirm receipt.','','Best regards'].join('\n');
   let filesP=null;const getFiles=()=>filesP||(filesP=partFiles().catch(e=>{filesP=null;throw e}));
   const zipName=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';
-  $('shW').onclick=()=>{openWA(waShort());M('')};
-  $('shM').onclick=()=>{open(gmailUrl('',title,mailShort()));M('')};
+  const combined=sel_.some(p=>p.pdfMeta&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1);
+  ['shW','shM'].forEach(id=>{$(id).disabled=combined;$(id).classList.toggle('off',combined)});
+  ['shW','shM'].forEach(id=>$(id).title=combined?'Not available: the drawings are in one combined PDF — use Download files (ZIP)':'');
+  $('shW').onclick=()=>{if(!combined){openWA(waText());M('')}};
+  $('shM').onclick=()=>{if(!combined){open(gmailUrl('',title,mailBody()));M('')}};
   $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await getFiles(),zipName);M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
 const pn=p=>p.dxfMeta.name.replace(/\.dxf$/i,'').replace(/[\\/:*?"<>|]/g,'_');
