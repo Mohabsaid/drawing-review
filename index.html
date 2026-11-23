@@ -176,7 +176,7 @@ function startProject(){
 $('app').innerHTML=`
 <header>
   <div><div class="sub"><a href="${esc(APP_URL)}">Open another folder</a></div><h1 id="pName">Loading…</h1><div class="sub" id="pSub"></div></div>
-  <div class="release" style="flex-direction:column;align-items:flex-end;gap:6px"><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end"><button class="apbtn rq" id="reqc" title="Opens WhatsApp with the changes-requested message">Request changes</button><button class="apbtn" id="stamp" title="Opens WhatsApp with the approval message">Approve</button></div><div class="sub" id="apInfo" style="margin:0"></div></div>
+  <div class="release" style="flex-direction:column;align-items:flex-end;gap:6px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="apbtn" id="stamp" title="Opens WhatsApp with the approval message">Approve</button><button class="apbtn rq" id="reqc" title="Opens WhatsApp with the changes-requested message">Request changes</button></div><div class="sub" id="apInfo" style="margin:0"></div></div>
 </header>
 <main>
   <aside><div class="rail-h">Parts — click to view · tick to send to a client</div><div id="rail"></div></aside>
