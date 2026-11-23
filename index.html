@@ -423,13 +423,13 @@ function renderReview(){const R=$('review');
   if(!P){R.innerHTML='';return}
   const st=projStatus(),ev=reviews.slice().sort((a,b)=>a.at<b.at?1:-1),dest=[WA?'WhatsApp':'',TO?'email':''].filter(Boolean).join(' or ');
   const pieces=PARTS.reduce((s,p)=>s+(p.qty||0),0);
-  R.innerHTML=`<div id="sendc"></div><div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
+  R.innerHTML=`<div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
    <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
    <div class="sub">Approve or Request changes opens WhatsApp (WhatsApp Web on a computer) with a short ready message — pick the designer and send. For a voice note, record it in that chat.</div>
-   <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
+   <div id="sendc"></div>
    <h2>Your decisions on this device</h2>
    <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Project approved':'Changes requested'}</span><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle()?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
   $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');renderSend();
@@ -478,11 +478,9 @@ function decide(decision){
     `Files reviewed: ${allFiles().length}`,
     `Review page: ${location.href}`].filter(Boolean).join('\n');
   const url=waUrl(text,WA);
-  const a=document.createElement('a');a.href=url;a.target=isMob?'_blank':'whatsapp_web';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+  const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
   renderRail();renderReview();
-  $('sendBox').innerHTML=`<div class="row2"><a class="btnl on" href="${esc(url)}" target="_blank" rel="noopener">Open WhatsApp again</a><button id="cpMsg">Copy message</button></div>`;
-  $('cpMsg').onclick=async()=>{try{await navigator.clipboard.writeText(text);$('cpMsg').textContent='Copied'}catch(e){msg('Copy failed — select the text manually.',1)}};
-  msg('WhatsApp opened with the message — choose the designer and press Send.'+(WA?'':' For a voice note, record it in that chat.'));
+
 }
 
 /* ---------- tabs ---------- */
