@@ -428,6 +428,10 @@ function renderReview(){const R=$('review');
 const libs={};function need(n,url){return libs[n]||(libs[n]=new Promise((ok,no)=>{if(window[n])return ok();const s=document.createElement('script');s.src=url;s.onload=ok;s.onerror=()=>no(new Error('Could not load '+n));document.head.appendChild(s)}))}
 const isMob=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 const waUrl=(t,ph)=>(isMob?'https://api.whatsapp.com/send?':'https://web.whatsapp.com/send/?')+(ph?'phone='+ph+'&':'')+'text='+encodeURIComponent(t);
+function openWA(t,ph){const u=waUrl(t,ph);
+  try{navigator.clipboard&&navigator.clipboard.writeText(t).catch(()=>{})}catch(e){}
+  let w=null;try{w=window.open(u,'rv_whatsapp')}catch(e){}
+  if(!w)location.href=u;else try{w.focus()}catch(e){}}
 const gmailUrl=(to,su,body)=>'https://mail.google.com/mail/?extsrc=mailto&url='+encodeURIComponent('mailto:'+encodeURIComponent(to||'')+'?subject='+encodeURIComponent(su)+'&body='+encodeURIComponent(body));
 const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
 const chosen=()=>picked.size?PARTS.filter(p=>picked.has(p.k)):PARTS;
@@ -443,7 +447,7 @@ function renderSend(){const S=$('sendc');if(!S||!PARTS.length)return;
   const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
   const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  $('shW').onclick=()=>{open(waUrl(waText()));M('WhatsApp opened with the message — choose the contact and send.')};
+  $('shW').onclick=()=>{openWA(waText());M('Message also copied — if WhatsApp opens without it, press Ctrl+V in the chat.')};
   $('shM').onclick=()=>{open(gmailUrl('',title,mailBody()));M('Gmail opened with the message — write the address and send.')};
   $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
@@ -467,8 +471,7 @@ function decide(decision){
     note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
     `Files reviewed: ${allFiles().length}`,
     `Review page: ${location.href}`].filter(Boolean).join('\n');
-  const url=waUrl(text,WA);
-  const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+  openWA(text,WA);
   renderRail();renderReview();
 
 }
