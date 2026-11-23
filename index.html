@@ -437,7 +437,7 @@ function renderReview(){const R=$('review');
 /* ---------- send selected parts to a client ---------- */
 const libs={};function need(n,url){return libs[n]||(libs[n]=new Promise((ok,no)=>{if(window[n])return ok();const s=document.createElement('script');s.src=url;s.onload=ok;s.onerror=()=>no(new Error('Could not load '+n));document.head.appendChild(s)}))}
 const isMob=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-const waUrl=(t,ph)=>(isMob?'https://api.whatsapp.com/send?':'https://web.whatsapp.com/send?')+(ph?'phone='+ph+'&':'')+'text='+encodeURIComponent(t);
+const waUrl=(t,ph)=>'https://api.whatsapp.com/send?'+(ph?'phone='+ph+'&':'')+'text='+encodeURIComponent(t);
 const gmailUrl=(to,su,body)=>'https://mail.google.com/mail/?view=cm&fs=1'+(to?'&to='+encodeURIComponent(to):'')+'&su='+encodeURIComponent(su)+'&body='+encodeURIComponent(body);
 const viewUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
 const chosen=()=>picked.size?PARTS.filter(p=>picked.has(p.k)):PARTS;
