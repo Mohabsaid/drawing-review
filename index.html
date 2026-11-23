@@ -477,7 +477,7 @@ function renderSend(){const S=$('sendc');if(!S||!PARTS.length)return;
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
   let filesP=null;const getFiles=()=>filesP||(filesP=partFiles().catch(e=>{filesP=null;throw e}));
   const zipName=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';
-  const combined=sel_.some(p=>p.pdfMeta&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1);
+  const pdfsAll=(P.pdf||[]),pdfReady=pdfsAll.every(m=>pdfDocs[m.id]||m.err),combined=!pdfReady||sel_.some(p=>p.pdfMeta&&pdfDocs[p.pdfMeta.id]&&pdfDocs[p.pdfMeta.id].numPages>1);
   ['shW','shM'].forEach(id=>{$(id).disabled=combined;$(id).classList.toggle('off',combined)});
   ['shW','shM'].forEach(id=>$(id).title=combined?'Not available: the drawings are in one combined PDF — use Download files (ZIP)':'');
   $('shW').onclick=()=>{if(!combined){openWA(waText());M('')}};
