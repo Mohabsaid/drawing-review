@@ -150,6 +150,7 @@ const fileBytes=id=>media(id),fileText=async id=>new TextDecoder('latin1').decod
 function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
   if(!m){if(/\/file\/d\//.test(s))throw new Error('That is a link to a single file. Paste the link of the FOLDER.');throw new Error('Paste the link of a Google Drive folder (it contains /folders/).')}
   return {id:m[1],rk:(s.match(/resourcekey=([\w-]+)/)||[])[1]||''}}
+try{localStorage.removeItem('rv_recent')}catch(e){}
 const ls={get:k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const b64u8=b=>{const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
 
@@ -161,7 +162,7 @@ if(/PASTE_/.test(API_KEY)){
 function landing(){
   $('app').innerHTML=`<header><div><h1>Drawing review</h1><div class="sub">Paste a Google Drive folder link and press Open</div></div></header>
   <div class="upl panel">
-   <div class="lkrow"><input type="text" id="lkUrl" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url"><button id="lkGo" class="on">Open</button></div>
+   <div class="lkrow"><input type="text" id="lkUrl" name="q_${Date.now().toString(36)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url"><button id="lkGo" class="on">Open</button></div>
    <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders. Then send the page's link to the engineer.</div>
    <div class="msg" id="lkMsg"></div>
   </div>`;
@@ -315,7 +316,7 @@ const loadErr=t=>{$('loadMsg').textContent=t;$('load3d').classList.add('err')};
     P=await scanProject(PROJECT_ID);
   }catch(e){$('pName').textContent='Project not available';loadErr(e.message);return}
   $('pName').textContent=P.name;
-  try{let rc=JSON.parse(ls.get('rv_recent')||'[]').filter(x=>x.id!==P.id);rc.unshift({id:P.id,name:P.name,at:Date.now(),url:location.href});ls.set('rv_recent',JSON.stringify(rc.slice(0,12)))}catch(e){}try{reviews=JSON.parse(ls.get('rv_dec_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
+  try{reviews=JSON.parse(ls.get('rv_dec_'+PROJECT_ID)||'[]')}catch(e){reviews=[]}
   PARTS=P.dxf.map(partFromDxf).sort((a,b)=>a.k.localeCompare(b.k,undefined,{numeric:true}));
   const keys=new Set(PARTS.map(p=>p.k));
   P.extraPdf=[];
