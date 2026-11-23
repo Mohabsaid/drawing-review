@@ -150,7 +150,7 @@ const fileBytes=id=>media(id),fileText=async id=>new TextDecoder('latin1').decod
 function parseLink(s){s=String(s||'').trim();const m=s.match(/folders\/([\w-]{15,})/)||s.match(/[?&]id=([\w-]{15,})/)||s.match(/^([\w-]{15,})$/);
   if(!m){if(/\/file\/d\//.test(s))throw new Error('That is a link to a single file. Paste the link of the FOLDER.');throw new Error('Paste the link of a Google Drive folder (it contains /folders/).')}
   return {id:m[1],rk:(s.match(/resourcekey=([\w-]+)/)||[])[1]||''}}
-try{localStorage.removeItem('rv_recent');Object.keys(localStorage).filter(k=>k.startsWith('rv_dec_')).forEach(k=>localStorage.removeItem(k))}catch(e){}
+try{localStorage.removeItem('rv_recent');localStorage.removeItem('rv_name');Object.keys(localStorage).filter(k=>k.startsWith('rv_dec_')).forEach(k=>localStorage.removeItem(k))}catch(e){}
 const ls={get:k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const b64u8=b=>{const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
 
