@@ -58,6 +58,7 @@ aside{border-right:1px solid var(--line)}
 .chk .t{font-weight:600}.chk p{margin:2px 0 0;color:var(--mute);font-size:14px;grid-column:2;max-width:70ch}
 .tag{font-size:12px;font-weight:600;border:1.5px solid currentColor;padding:2px 6px;align-self:start;text-align:center}
 .tag.issue{color:var(--red)}.tag.ok{color:var(--mute)}
+.review>*{flex-shrink:0}
 .review{border-left:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px}
 .files{font-size:13px;border:1px solid var(--line)}.files div{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}.files div:last-child{border:0}
 .state{font-weight:600}.state.rejected,.state.stale{color:var(--red)}
@@ -424,14 +425,14 @@ function renderReview(){const R=$('review');
   const pieces=PARTS.reduce((s,p)=>s+(p.qty||0),0);
   R.innerHTML=`<div id="sendc"></div><div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
-   <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" value="${esc(ls.get('rv_name'))}">
+   <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" autocomplete="off">
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
    <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
    <div class="sub">Approve or Request changes opens WhatsApp (WhatsApp Web on a computer) with a short ready message — pick the designer and send. For a voice note, record it in that chat.</div>
    <div id="sendBox"></div>
    <div class="msg" id="msg"></div>
    <h2>Your decisions on this device</h2>
-   <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Project approved':'Changes requested'}</span> · <b>${esc(e.name)}</b><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle()?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
+   <div>${ev.length?ev.map(e=>`<div class="ev"><span class="d ${e.decision}">${e.decision==='approve'?'Project approved':'Changes requested'}</span><div class="when">${fmtT(e.at)}</div>${e.bundle!==bundle()?'<div class="old">on an older version of the files</div>':''}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join(''):'<div class="empty">None yet.</div>'}</div>`;
   $('bAp').onclick=()=>decide('approve');$('bRj').onclick=()=>decide('reject');renderSend();
 }
 /* ---------- send selected parts to a client ---------- */
@@ -472,8 +473,7 @@ function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.upda
 function decide(decision){
   const name=$('rvName').value.trim(),note=$('note').value.trim();
   if(!name){msg('Write your name first.',1);$('rvName').focus();return}
-  ls.set('rv_name',name);
-  reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
+    reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
   const text=[(decision==='approve'?'*PROJECT APPROVED* for fabrication':'*CHANGES REQUESTED*')+` — ${P.name}`,
     `By: ${name}`,`Time: ${fmtT(Date.now())}`,
     note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
