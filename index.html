@@ -62,7 +62,7 @@ aside{border-right:1px solid var(--line)}
 .files{font-size:13px;border:1px solid var(--line)}.files div{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}.files div:last-child{border:0}
 .state{font-weight:600}.state.rejected,.state.stale{color:var(--red)}
 textarea,input[type=text],input[type=email],input[type=password]{width:100%;border:1.5px solid var(--ink);padding:8px;font-size:16px;background:var(--bg)}
-textarea{min-height:84px;resize:vertical}
+textarea{min-height:84px;resize:vertical}#lkUrl{min-height:0;height:48px;resize:none;overflow:hidden;white-space:nowrap;line-height:30px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btnl{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border:1.5px solid var(--ink);text-decoration:none;font-weight:600}.btnl.on{background:var(--ink);color:var(--bg)}
 .acts .ap{background:var(--ink);color:var(--bg)}.acts .rj{border-color:var(--red);color:var(--red)}
@@ -161,14 +161,14 @@ if(/PASTE_/.test(API_KEY)){
 function landing(){
   $('app').innerHTML=`<header><div><h1>Drawing review</h1><div class="sub">Paste a Google Drive folder link and press Open</div></div></header>
   <div class="upl panel">
-   <div class="lkrow"><input type="text" id="lkUrl" name="q_${Date.now().toString(36)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link" inputmode="url"><button id="lkGo" class="on">Open</button></div>
+   <div class="lkrow"><textarea id="lkUrl" rows="1" wrap="off" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Paste Google Drive folder link" aria-label="Google Drive folder link"></textarea><button id="lkGo" class="on">Open</button></div>
    <div class="sub">The folder's sharing must be "Anyone with the link". STEP, DXF and PDF files are found in all its sub-folders. Then send the page's link to the engineer.</div>
    <div class="msg" id="lkMsg"></div>
   </div>`;
   const go=async()=>{const M=$('lkMsg');M.className='msg';
     let L;try{L=parseLink($('lkUrl').value)}catch(e){M.textContent=e.message;M.className='msg err';$('lkUrl').focus();return}
     M.textContent='Opening…';location.href=APP_URL+'?f='+L.id+(L.rk?'&rk='+L.rk:'')};
-  $('lkGo').onclick=go;$('lkUrl').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+  $('lkGo').onclick=go;$('lkUrl').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();go()}});$('lkUrl').addEventListener('input',e=>{const t=e.target,v=t.value.replace(/[\r\n]+/g,'');if(v!==t.value)t.value=v});
 }
 
 /* ================= project page ================= */
