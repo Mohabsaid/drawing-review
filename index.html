@@ -425,7 +425,6 @@ function renderReview(){const R=$('review');
   const pieces=PARTS.reduce((s,p)=>s+(p.qty||0),0);
   R.innerHTML=`<div id="sendc"></div><div><h2>Project review</h2><div class="sub">${PARTS.length} parts · ${pieces} pieces · ${allFiles().length} files</div></div>
    <div class="state ${st.s}">${esc(st.label)}${st.s!=='pending'?' <span class="sub">(on this device)</span>':''}</div>
-   <input type="text" id="rvName" placeholder="Your name" aria-label="Your name" autocomplete="off">
    <textarea id="note" placeholder="Comment — which part and what needs to change? e.g. Part D: hole pitch 150${WA?' (or send a voice note in WhatsApp)':' (or send a voice note in WhatsApp)'}"></textarea>
    <div class="row2 acts"><button class="ap" id="bAp">Approve</button><button class="rj" id="bRj">Request changes</button></div>
    <div class="sub">Approve or Request changes opens WhatsApp (WhatsApp Web on a computer) with a short ready message — pick the designer and send. For a voice note, record it in that chat.</div>
@@ -471,11 +470,10 @@ async function zipDownload(fs){await need('JSZip','https://cdnjs.cloudflare.com/
   const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.updated)})`:'—'}
 function decide(decision){
-  const name=$('rvName').value.trim(),note=$('note').value.trim();
-  if(!name){msg('Write your name first.',1);$('rvName').focus();return}
+  const name='',note=$('note').value.trim();
     reviews.push({decision,name,note,bundle:bundle(),at:new Date().toISOString()});ls.set('rv_dec_'+PROJECT_ID,JSON.stringify(reviews));
   const text=[(decision==='approve'?'*PROJECT APPROVED* for fabrication':'*CHANGES REQUESTED*')+` — ${P.name}`,
-    `By: ${name}`,`Time: ${fmtT(Date.now())}`,
+    `Time: ${fmtT(Date.now())}`,
     note?`Comment: ${note}`:(decision==='reject'?'Comment: see my voice note':''),
     `Files reviewed: ${allFiles().length}`,
     `Review page: ${location.href}`].filter(Boolean).join('\n');
