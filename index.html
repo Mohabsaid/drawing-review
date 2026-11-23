@@ -447,21 +447,32 @@ function renderSend(){const S=$('sendc');if(!S||!PARTS.length)return;
   const waText=()=>[`*${title}*`,'',...partLines()].join('\n').trim();
   const mailBody=()=>['Hello,','',`Please find below the manufacturing files for ${title}.`,'',...partLines(),'Please confirm receipt.','','Best regards'].join('\n');
   const open=u=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()};
-  $('shW').onclick=()=>{openWA(waText());M('Message also copied — if WhatsApp opens without it, press Ctrl+V in the chat.')};
-  $('shM').onclick=()=>{open(gmailUrl('',title,mailBody()));M('Gmail opened with the message — write the address and send.')};
-  $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await partFiles());M('ZIP downloaded.')}catch(e){M(e.message,1)}};
+  const fileList=()=>sel_.map(p=>`${p.k}${p.nice?' – '+p.nice:''} (Qty ${p.qty??'?'}${p.rl?' R&L':''}${p.t!=null?', '+p.t+' mm':p.tModel?', '+p.tModel+' mm':''})`);
+  const waShort=()=>[`*${title}*`,'Files attached (DXF + drawing of each part):',...fileList().map(l=>'• '+l)].join('\n');
+  const mailShort=()=>['Hello,','',`Please find attached the manufacturing files for ${title} (DXF and drawing of each part):`,'',...fileList().map(l=>'• '+l),'','Please confirm receipt.','','Best regards'].join('\n');
+  let filesP=null;const getFiles=()=>filesP||(filesP=partFiles().catch(e=>{filesP=null;throw e}));getFiles().catch(()=>{});
+  const zipName=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';
+  async function sendVia(kind){const fs=await getFiles();
+    if(navigator.canShare&&navigator.share){try{if(navigator.canShare({files:fs})){await navigator.share({files:fs,title,text:kind==='wa'?waShort():mailShort()});M('Sent.');return}}catch(e){if(e.name==='AbortError')return}}
+    await zipDownload(fs,zipName);
+    if(kind==='wa'){openWA(waShort());M(`${zipName} downloaded — drag it into the WhatsApp chat and send.`)}
+    else{open(gmailUrl('',title,mailShort()));M(`${zipName} downloaded — attach it in Gmail and send.`)}}
+  $('shW').onclick=()=>{M('Preparing files…');sendVia('wa').catch(e=>M(e.message,1))};
+  $('shM').onclick=()=>{M('Preparing files…');sendVia('mail').catch(e=>M(e.message,1))};
+  $('zipF').onclick=async()=>{M('Preparing ZIP…');try{await zipDownload(await getFiles(),zipName);M('ZIP downloaded.')}catch(e){M(e.message,1)}};
 }
+const pn=p=>p.dxfMeta.name.replace(/\.dxf$/i,'').replace(/[\\/:*?"<>|]/g,'_');
 async function partFiles(){const out=[];
   for(const p of chosen()){
-    if(p.dxfRaw!=null)out.push(new File([p.dxfRaw],p.dxfMeta.name,{type:'application/dxf'}));
+    if(p.dxfRaw!=null)out.push(new File([p.dxfRaw],p.dxfMeta.name,{type:'application/dxf'}));else throw new Error('DXF of part '+p.k+' is not loaded yet — try again in a moment.');
     const m=p.pdfMeta;if(!m)continue;const b=pdfBytes[m.id];if(!b)continue;
     if(m.page&&pdfDocs[m.id]&&pdfDocs[m.id].numPages>1){await need('PDFLib','https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
       const src=await PDFLib.PDFDocument.load(b),d=await PDFLib.PDFDocument.create(),[pg]=await d.copyPages(src,[m.page-1]);d.addPage(pg);
-      out.push(new File([await d.save()],`${p.k}_drawing.pdf`,{type:'application/pdf'}))}
-    else out.push(new File([b],m.name,{type:'application/pdf'}))}
+      out.push(new File([await d.save()],pn(p)+'.pdf',{type:'application/pdf'}))}
+    else out.push(new File([b],pn(p)+'.pdf',{type:'application/pdf'}))}
   if(!out.length)throw new Error('No files to send.');return out}
-async function zipDownload(fs){await need('JSZip','https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');const z=new JSZip();for(const f of fs)z.file(f.name,f);
-  const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+async function zipDownload(fs,nm){await need('JSZip','https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');const z=new JSZip();for(const f of fs)z.file(f.name,f);
+  const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nm||((P.name+(picked.size?' - parts '+[...picked].join(' '):' - all parts')).replace(/[\\/:*?"<>|]/g,'_')+'.zip');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function fileLine(m){return m?`${m.name}${m.page?' p.'+m.page:''} (${fmtT(m.updated)})`:'—'}
 function decide(decision){
   const name='',note='';
